@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CP Leaderboard</title>
+<style>
+  :root { --bg:#fff; --fg:#111; --muted:#666; --line:#e5e5e5; --accent:#2563eb; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1115; --fg:#e8e8e8; --muted:#999; --line:#2a2d35; --accent:#60a5fa; } }
+  body { background:var(--bg); color:var(--fg); font:15px/1.5 system-ui,sans-serif; max-width:760px; margin:0 auto; padding:24px 16px; }
+  h1 { margin:0 0 4px } .muted { color:var(--muted); font-size:13px }
+  .tabs button { background:none; border:1px solid var(--line); color:var(--fg); padding:6px 12px; border-radius:6px; cursor:pointer; margin-right:6px }
+  .tabs button.on { border-color:var(--accent); color:var(--accent) }
+  table { width:100%; border-collapse:collapse; margin:12px 0 32px } th,td { text-align:left; padding:8px; border-bottom:1px solid var(--line) }
+  td.n { text-align:right; font-variant-numeric:tabular-nums } a { color:var(--accent) }
+</style>
+</head>
+<body>
+<h1>CP Leaderboard</h1>
+<div class="muted" id="updated"></div>
+<h2>Leaderboard</h2>
+<div class="tabs" id="tabs"></div>
+<table><thead><tr><th>#</th><th>Name</th><th>Points</th><th>Solved</th><th>CF</th><th>LC</th></tr></thead><tbody id="board"></tbody></table>
+<h2>Upcoming contests</h2>
+<table><tbody id="contests"></tbody></table>
+<script>
+const PERIODS = { week: "Weekly", biweek: "Bi-weekly", month: "Monthly", all: "All-time" };
+const esc = s => String(s ?? "–").replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
+
+fetch("leaderboard.json").then(r => r.json()).then(data => {
+  document.getElementById("updated").textContent = "Updated " + new Date(data.updated_at).toLocaleString();
+  const tabs = document.getElementById("tabs");
+  const show = key => {
+    [...tabs.children].forEach(b => b.classList.toggle("on", b.dataset.k === key));
+    document.getElementById("board").innerHTML = data.periods[key].map((r, i) =>
+      `<tr><td>${i + 1}</td><td>${esc(r.name)}</td><td class="n">${r.points}</td><td class="n">${r.solved}</td>` +
+      `<td class="n">${esc(r.cf_rating)}</td><td class="n">${esc(r.lc_rating)}</td></tr>`).join("");
+  };
+  for (const [k, label] of Object.entries(PERIODS)) {
+    const b = document.createElement("button");
+    b.textContent = label; b.dataset.k = k; b.onclick = () => show(k);
+    tabs.appendChild(b);
+  }
+  show("week");
+});
+
+fetch("contests.json").then(r => r.json()).then(list => {
+  document.getElementById("contests").innerHTML = list.map(c =>
+    `<tr><td>${c.platform === "codeforces" ? "CF" : "LC"}</td><td><a href="${esc(c.url)}" target="_blank">${esc(c.name)}</a></td>` +
+    `<td>${new Date(c.start * 1000).toLocaleString()}</td><td class="n">${Math.round(c.duration / 60)} min</td></tr>`).join("");
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# Add yourself here (open a PR). Either handle is optional.
+
+[[users]]
+name = "friend1"
+codeforces = "tourist"
+leetcode = "lee215"
+
+# [[users]]
+# name = "friend2"
+# codeforces = "cf_handle"
+# leetcode = "lc_username"
