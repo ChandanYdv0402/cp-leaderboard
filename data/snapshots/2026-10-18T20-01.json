@@ -1,0 +1,14 @@
+{
+  "taken_at": "2026-10-18T20:01:12.131855290Z",
+  "users": {
+    "friend1": {
+      "cf_rating": 3380,
+      "cf_solved": 3055,
+      "cf_points": 56880,
+      "lc_rating": 2204.316,
+      "lc_easy": 126,
+      "lc_medium": 411,
+      "lc_hard": 149
+    }
+  }
+}

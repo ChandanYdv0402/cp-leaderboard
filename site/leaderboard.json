@@ -1,0 +1,41 @@
+{
+  "periods": {
+    "all": [
+      {
+        "cf_rating": 3380,
+        "lc_rating": 2204.0,
+        "name": "friend1",
+        "points": 64600,
+        "solved": 3741
+      }
+    ],
+    "biweek": [
+      {
+        "cf_rating": 3380,
+        "lc_rating": 2204.0,
+        "name": "friend1",
+        "points": 0,
+        "solved": 0
+      }
+    ],
+    "month": [
+      {
+        "cf_rating": 3380,
+        "lc_rating": 2204.0,
+        "name": "friend1",
+        "points": 0,
+        "solved": 0
+      }
+    ],
+    "week": [
+      {
+        "cf_rating": 3380,
+        "lc_rating": 2204.0,
+        "name": "friend1",
+        "points": 0,
+        "solved": 0
+      }
+    ]
+  },
+  "updated_at": "2026-10-18T20:01:12.131855290Z"
+}

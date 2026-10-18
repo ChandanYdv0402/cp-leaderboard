@@ -1,0 +1,37 @@
+[
+  {
+    "platform": "codeforces",
+    "name": "Codeforces Round (Div. 2)",
+    "start": 1792839900,
+    "duration": 7200,
+    "url": "https://codeforces.com/contests/2277"
+  },
+  {
+    "platform": "leetcode",
+    "name": "Biweekly Contest 194",
+    "start": 1792852200,
+    "duration": 5400,
+    "url": "https://leetcode.com/contest/biweekly-contest-194"
+  },
+  {
+    "platform": "leetcode",
+    "name": "Weekly Contest 525",
+    "start": 1792895400,
+    "duration": 5400,
+    "url": "https://leetcode.com/contest/weekly-contest-525"
+  },
+  {
+    "platform": "codeforces",
+    "name": "Codeforces Round (Div. 2)",
+    "start": 1793025300,
+    "duration": 8100,
+    "url": "https://codeforces.com/contests/2272"
+  },
+  {
+    "platform": "codeforces",
+    "name": "Codeforces Round (Div. 3)",
+    "start": 1793457300,
+    "duration": 8100,
+    "url": "https://codeforces.com/contests/2278"
+  }
+]
