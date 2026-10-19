@@ -5,7 +5,7 @@ Weekly, bi-weekly, monthly, and all-time Codeforces + LeetCode standings, with u
 ## Supabase setup
 
 1. Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in the SQL Editor.
-2. Enable GitHub OAuth and/or email OTP under Authentication. Email sign-in accepts Gmail usernames and appends `@gmail.com`; the username is remembered locally, and empty platform handle fields are prefilled from it after sign-in. Add `https://chandanydv0402.github.io/cp-leaderboard/` as a redirect URL.
+2. Enable Google OAuth and/or email OTP under Authentication. For Google OAuth, create a Google OAuth web client, add Supabase's callback URL to its authorized redirect URIs, and enter its client ID and secret in Supabase's Google provider settings. Email sign-in accepts Gmail usernames and appends `@gmail.com`; the username is remembered locally, and empty platform handle fields are prefilled from it after sign-in. Add `https://chandanydv0402.github.io/cp-leaderboard/` as a redirect URL.
 3. Put the project URL and anon key in the `SUPABASE_URL` and `SUPABASE_ANON_KEY` constants in `site/index.html`. These browser values are public; database access is controlled by RLS.
 4. Add GitHub repository Actions secrets named `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Never put the service-role key in the site or commit it.
 5. In repository Settings → Pages, select **GitHub Actions** as the source. Run the `pages` workflow once, then run `update` to populate initial data.

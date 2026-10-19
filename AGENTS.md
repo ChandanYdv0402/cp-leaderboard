@@ -11,6 +11,7 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 - Added `supabase/schema.sql` with `profiles`, `accounts`, `snapshots`, and `contests`, RLS policies, grants, and the `leaderboard(days)` RPC.
 - Reworked `src/main.rs` to fetch profiles/accounts from Supabase REST, fetch platform stats using the existing `src/platforms.rs`, preserve stats when an active platform fetch fails, clear stats for unlinked platforms, mark successful handles verified, and write snapshots/contests.
 - Updated `site/index.html` with Supabase OAuth/email sign-in, profile and handle editing, leaderboard RPC queries, and upcoming contest queries.
+- Added Google OAuth sign-in to `site/index.html`; the Supabase Google provider still needs a Google OAuth client ID and secret configured by the project owner.
 - Email sign-in takes a Gmail username and appends the visible `@gmail.com` suffix.
 - The Gmail username draft persists locally across reloads; on first sign-in, empty platform handle fields default to the sanitized email prefix and remain editable.
 - Each editable Codeforces/LeetCode handle accepts a username or public profile URL, normalizes supported URLs to usernames, and links to the corresponding public profile page.
@@ -29,7 +30,7 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 
 ## Current Blockers / Unverified
 
-- GitHub OAuth is disabled pending a GitHub OAuth app's client ID and secret; email OTP has not been tested end to end.
+- Google OAuth is wired in the site but requires a Google OAuth client ID and secret in Supabase; email OTP has not been tested end to end. GitHub OAuth remains disabled pending its own OAuth credentials.
 - No users have signed up or connected handles yet, so per-user snapshots and handle verification remain untested.
 - The fetcher compiled and ran successfully in GitHub Actions. Cargo/Rust is unavailable in the local environment.
 - Local HTTP preview is available at `http://localhost:8000/` in the current session; it uses a PowerShell server because Python is unavailable.
@@ -39,7 +40,7 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 1. Sign in with email OTP, create the first profile, and connect platform handles.
 2. Run the `update` workflow manually again; verify platform fetches, verification updates, and per-user snapshot writes.
 3. Verify own-profile/account RLS and leaderboard periods. Install/use Rust locally for `cargo fmt` if desired.
-4. Configure a GitHub OAuth app and enable the GitHub provider if GitHub sign-in is wanted.
+4. Configure a Google OAuth client and enable the Google provider in Supabase; configure GitHub OAuth separately if GitHub sign-in is wanted.
 5. Only after successful verification, decide whether to import or remove the legacy TOML/JSON data.
 
 ## Project Conventions

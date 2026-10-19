@@ -36,6 +36,7 @@
   <div class="muted" id="auth-status" aria-live="polite"></div>
 </header>
 <section class="auth" aria-label="Account">
+  <button class="action" id="google-login">Continue with Google</button>
   <button class="action" id="github-login">Continue with GitHub</button>
   <div class="email-address" id="email-address">
     <input id="email" type="text" maxlength="30" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="yourname" aria-label="Gmail username">
@@ -64,6 +65,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const SUPABASE_URL = "https://ttcbdfmwsywdgjcwsllf.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_I1p51wV_1GUVghTpsFbY5g_ex5cEJL7";
+const GOOGLE_AUTH_ENABLED = true;
 const GITHUB_AUTH_ENABLED = false;
 const PERIODS = { week: "Weekly", biweek: "Bi-weekly", month: "Monthly", all: "All-time" };
 const esc = s => String(s ?? "–").replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
@@ -153,6 +155,7 @@ async function loadContests() {
 async function loadProfile(user) {
   $("profile").hidden = !user;
   $("logout").hidden = !user;
+  $("google-login").hidden = !GOOGLE_AUTH_ENABLED || Boolean(user);
   $("github-login").hidden = !GITHUB_AUTH_ENABLED || Boolean(user);
   $("email-address").hidden = Boolean(user);
   $("email-login").hidden = Boolean(user);
@@ -202,11 +205,19 @@ for (const [key, label] of Object.entries(PERIODS)) {
 
 if (!configured) {
   $("updated").textContent = "Set the Supabase project URL and anon key in this page to connect.";
+  $("google-login").disabled = true;
   $("github-login").disabled = true;
   $("email-login").disabled = true;
   $("board").innerHTML = "<tr><td colspan=\"6\">Supabase configuration required.</td></tr>";
   $("contests").innerHTML = "<tr><td>Supabase configuration required.</td></tr>";
 } else {
+  $("google-login").onclick = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}${window.location.pathname}` }
+    });
+    if (error) showError("auth-status", error);
+  };
   $("github-login").onclick = async () => {
     const { error } = await supabase.auth.signInWithOAuth({ provider: "github", options: { redirectTo: window.location.href.split("#")[0] } });
     if (error) showError("auth-status", error);
