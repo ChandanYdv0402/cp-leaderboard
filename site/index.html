@@ -15,8 +15,12 @@
   button, input { font:inherit } button { cursor:pointer }
   .auth, .profile { border-bottom:1px solid var(--line); padding:16px 0; }
   .auth { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+  .email-address { display:flex; align-items:center; gap:0; border:1px solid var(--line); border-radius:4px; background:var(--bg); color:var(--muted); font-size:15px; white-space:nowrap; }
+  .email-address input { width:10ch; border:0; background:transparent; }
+  .email-address span { padding-right:8px; }
   .profile form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; align-items:end; }
   label { display:grid; gap:4px; color:var(--muted); font-size:13px; }
+  .profile-link { font-size:13px; }
   input { min-width:0; padding:7px 8px; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:4px; }
   button.action { padding:7px 10px; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:4px; }
   button:disabled { opacity:.55; cursor:wait }
@@ -33,7 +37,10 @@
 </header>
 <section class="auth" aria-label="Account">
   <button class="action" id="github-login">Continue with GitHub</button>
-  <input id="email" type="email" autocomplete="email" placeholder="Email for sign-in link" aria-label="Email for sign-in link">
+  <div class="email-address" id="email-address">
+    <input id="email" type="text" maxlength="30" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="yourname" aria-label="Gmail username">
+    <span aria-hidden="true">@gmail.com</span>
+  </div>
   <button class="action" id="email-login">Send link</button>
   <button class="action" id="logout" hidden>Log out</button>
 </section>
@@ -41,8 +48,8 @@
   <h2>My profile</h2>
   <form id="profile-form">
     <label>Name<input id="name" required minlength="2" maxlength="32" autocomplete="nickname"></label>
-    <label>Codeforces handle<input id="codeforces" maxlength="40" autocomplete="off"></label>
-    <label>LeetCode username<input id="leetcode" maxlength="40" autocomplete="off"></label>
+    <label>Codeforces handle<input id="codeforces" maxlength="200" autocomplete="off" placeholder="Handle or profile URL"><a class="profile-link" id="codeforces-link" target="_blank" rel="noopener noreferrer" hidden>Open Codeforces profile</a></label>
+    <label>LeetCode username<input id="leetcode" maxlength="200" autocomplete="off" placeholder="Username or profile URL"><a class="profile-link" id="leetcode-link" target="_blank" rel="noopener noreferrer" hidden>Open LeetCode profile</a></label>
     <button class="action" id="save-profile" type="submit">Save profile</button>
   </form>
   <p class="message" id="profile-message" aria-live="polite"></p>
@@ -65,7 +72,53 @@ const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : nu
 const $ = id => document.getElementById(id);
 const setMessage = (id, text) => { $(id).textContent = text; };
 const showError = (id, error) => setMessage(id, error?.message || "Something went wrong.");
+const HANDLE_PATTERN = /^[A-Za-z0-9_.-]{1,40}$/;
+function handleFromProfileInput(platform, value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const isProfileUrl = /^(?:https?:\/\/)?(?:www\.)?(?:codeforces\.com|leetcode\.com)\//i.test(raw);
+  if (!isProfileUrl) return raw;
+  let url;
+  try {
+    url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+  } catch {
+    return null;
+  }
+  const expectedHost = platform === "codeforces" ? "codeforces.com" : "leetcode.com";
+  if (url.hostname.toLowerCase().replace(/^www\./, "") !== expectedHost) return null;
+  const route = platform === "codeforces" ? /^\/profile\/([^/]+)\/?$/i : /^\/u\/([^/]+)\/?$/i;
+  const match = url.pathname.match(route);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}
+function updateProfileLinks() {
+  const codeforces = handleFromProfileInput("codeforces", $("codeforces").value);
+  const leetcode = handleFromProfileInput("leetcode", $("leetcode").value);
+  const codeforcesValid = typeof codeforces === "string" && HANDLE_PATTERN.test(codeforces);
+  const leetcodeValid = typeof leetcode === "string" && HANDLE_PATTERN.test(leetcode);
+  $("codeforces-link").hidden = !codeforcesValid;
+  $("leetcode-link").hidden = !leetcodeValid;
+  if (codeforcesValid) $("codeforces-link").href = `https://codeforces.com/profile/${encodeURIComponent(codeforces)}`;
+  if (leetcodeValid) $("leetcode-link").href = `https://leetcode.com/u/${encodeURIComponent(leetcode)}/`;
+}
+function normalizeHandleField(platform, inputId) {
+  const handle = handleFromProfileInput(platform, $(inputId).value);
+  if (typeof handle === "string" && HANDLE_PATTERN.test(handle)) $(inputId).value = handle;
+  updateProfileLinks();
+}
+$("codeforces").addEventListener("input", updateProfileLinks);
+$("codeforces").addEventListener("blur", () => normalizeHandleField("codeforces", "codeforces"));
+$("leetcode").addEventListener("input", updateProfileLinks);
+$("leetcode").addEventListener("blur", () => normalizeHandleField("leetcode", "leetcode"));
+const EMAIL_USERNAME_KEY = "cp-leaderboard.gmail-username";
+$("email").value = localStorage.getItem(EMAIL_USERNAME_KEY) || "";
+$("email").addEventListener("input", () => localStorage.setItem(EMAIL_USERNAME_KEY, $("email").value));
 let currentPeriod = "week";
+let profileLoadedFor = null;
 
 async function showLeaderboard(period = currentPeriod) {
   currentPeriod = period;
@@ -101,21 +154,31 @@ async function loadProfile(user) {
   $("profile").hidden = !user;
   $("logout").hidden = !user;
   $("github-login").hidden = !GITHUB_AUTH_ENABLED || Boolean(user);
-  $("email").hidden = Boolean(user);
+  $("email-address").hidden = Boolean(user);
   $("email-login").hidden = Boolean(user);
   if (!user) {
+    profileLoadedFor = null;
     $("auth-status").textContent = "";
     return;
   }
   $("auth-status").textContent = user.email || "Signed in";
+  if (profileLoadedFor === user.id) return;
+  profileLoadedFor = user.id;
   const [{ data: profile }, { data: accounts, error }] = await Promise.all([
     supabase.from("profiles").select("name").eq("id", user.id).maybeSingle(),
     supabase.from("accounts").select("platform,handle,verified").eq("user_id", user.id)
   ]);
-  if (error) return showError("profile-message", error);
+  if (error) {
+    profileLoadedFor = null;
+    return showError("profile-message", error);
+  }
+  if (profileLoadedFor !== user.id) return;
+  const suggestedHandle = (user.email?.split("@")[0] || "").split("+")[0]
+    .replace(/[^A-Za-z0-9_.-]/g, "").slice(0, 40);
   $("name").value = profile?.name || user.user_metadata?.full_name || "";
-  $("codeforces").value = accounts.find(account => account.platform === "codeforces")?.handle || "";
-  $("leetcode").value = accounts.find(account => account.platform === "leetcode")?.handle || "";
+  $("codeforces").value = accounts.find(account => account.platform === "codeforces")?.handle || suggestedHandle;
+  $("leetcode").value = accounts.find(account => account.platform === "leetcode")?.handle || suggestedHandle;
+  updateProfileLinks();
   const pending = accounts.filter(account => !account.verified).map(account => account.platform);
   setMessage("profile-message", pending.length ? `Pending verification: ${pending.join(", ")}.` : "");
 }
@@ -149,8 +212,12 @@ if (!configured) {
     if (error) showError("auth-status", error);
   };
   $("email-login").onclick = async () => {
-    const email = $("email").value.trim();
-    if (!email) return setMessage("auth-status", "Enter your email address first.");
+    const username = $("email").value.trim();
+    if (!username) return setMessage("auth-status", "Enter your Gmail username first.");
+    if (!/^[A-Za-z0-9.]{1,30}$/.test(username)) {
+      return setMessage("auth-status", "Use only letters, numbers, and periods before @gmail.com.");
+    }
+    const email = `${username}@gmail.com`;
     const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.href.split("#")[0] } });
     setMessage("auth-status", error ? error.message : "Sign-in link sent. Check your email.");
   };
@@ -163,6 +230,21 @@ if (!configured) {
     event.preventDefault();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return setMessage("profile-message", "Sign in before saving a profile.");
+    const accountsToSave = [
+      { platform: "codeforces", inputId: "codeforces" },
+      { platform: "leetcode", inputId: "leetcode" }
+    ].map(account => ({
+      ...account,
+      raw: $(account.inputId).value.trim(),
+      handle: handleFromProfileInput(account.platform, $(account.inputId).value)
+    }));
+    const invalidAccount = accountsToSave.find(account =>
+      account.raw && (typeof account.handle !== "string" || !HANDLE_PATTERN.test(account.handle)));
+    if (invalidAccount) {
+      return setMessage("profile-message", `Enter a valid ${invalidAccount.platform} handle or profile URL.`);
+    }
+    for (const account of accountsToSave) $(account.inputId).value = account.handle || "";
+    updateProfileLinks();
     const button = $("save-profile");
     button.disabled = true;
     setMessage("profile-message", "Saving...");
@@ -172,8 +254,7 @@ if (!configured) {
       button.disabled = false;
       return showError("profile-message", profileError);
     }
-    for (const [platform, inputId] of [["codeforces", "codeforces"], ["leetcode", "leetcode"]]) {
-      const handle = $(inputId).value.trim();
+    for (const { platform, handle } of accountsToSave) {
       const query = supabase.from("accounts").delete().eq("user_id", user.id).eq("platform", platform);
       const result = handle
         ? await supabase.from("accounts").upsert(
