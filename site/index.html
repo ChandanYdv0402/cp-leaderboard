@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CP Leaderboard</title>
 <style>
-  :root { --bg:#fff; --fg:#111; --muted:#666; --line:#e5e5e5; --accent:#2563eb; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0f1115; --fg:#e8e8e8; --muted:#999; --line:#2a2d35; --accent:#60a5fa; } }
+  :root { color-scheme:dark; --bg:#0f1115; --fg:#e8e8e8; --muted:#999; --line:#2a2d35; --accent:#60a5fa; }
   body { background:var(--bg); color:var(--fg); font:15px/1.5 system-ui,sans-serif; max-width:760px; margin:0 auto; padding:24px 16px; }
   header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
   h1 { margin:0 0 4px } h2 { margin-top:28px } .muted { color:var(--muted); font-size:13px }
@@ -15,9 +14,6 @@
   button, input { font:inherit } button { cursor:pointer }
   .auth, .profile { border-bottom:1px solid var(--line); padding:16px 0; }
   .auth { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
-  .email-address { display:flex; align-items:center; gap:0; border:1px solid var(--line); border-radius:4px; background:var(--bg); color:var(--muted); font-size:15px; white-space:nowrap; }
-  .email-address input { width:10ch; border:0; background:transparent; }
-  .email-address span { padding-right:8px; }
   .profile form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; align-items:end; }
   label { display:grid; gap:4px; color:var(--muted); font-size:13px; }
   .profile-link { font-size:13px; }
@@ -36,13 +32,7 @@
   <div class="muted" id="auth-status" aria-live="polite"></div>
 </header>
 <section class="auth" aria-label="Account">
-  <button class="action" id="google-login">Continue with Google</button>
-  <button class="action" id="github-login">Continue with GitHub</button>
-  <div class="email-address" id="email-address">
-    <input id="email" type="text" maxlength="30" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="yourname" aria-label="Gmail username">
-    <span aria-hidden="true">@gmail.com</span>
-  </div>
-  <button class="action" id="email-login">Send link</button>
+  <button class="action" id="login" disabled>Sign in</button>
   <button class="action" id="logout" hidden>Log out</button>
 </section>
 <section class="profile" id="profile" hidden>
@@ -65,12 +55,18 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const SUPABASE_URL = "https://ttcbdfmwsywdgjcwsllf.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_I1p51wV_1GUVghTpsFbY5g_ex5cEJL7";
-const GOOGLE_AUTH_ENABLED = true;
-const GITHUB_AUTH_ENABLED = false;
+// Clerk publishable key (pk_test_... / pk_live_...) — public, safe to commit. Login providers are chosen in the Clerk dashboard.
+const CLERK_PUBLISHABLE_KEY = "pk_test_dHJ1ZS1qYXktNjE1Ny5jbGVyay5hY2NvdW50cy5kZXYk";
+const CLERK_JS_URL = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js";
 const PERIODS = { week: "Weekly", biweek: "Bi-weekly", month: "Monthly", all: "All-time" };
 const esc = s => String(s ?? "–").replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
 const configured = !SUPABASE_URL.includes("YOUR_PROJECT") && !SUPABASE_ANON_KEY.includes("YOUR_SUPABASE");
-const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const clerkConfigured = !CLERK_PUBLISHABLE_KEY.startsWith("YOUR_");
+let clerk = null;
+// Supabase third-party auth: every request carries the Clerk session token (or none when logged out).
+const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  accessToken: async () => (await clerk?.session?.getToken()) ?? null
+}) : null;
 const $ = id => document.getElementById(id);
 const setMessage = (id, text) => { $(id).textContent = text; };
 const showError = (id, error) => setMessage(id, error?.message || "Something went wrong.");
@@ -116,9 +112,34 @@ $("codeforces").addEventListener("input", updateProfileLinks);
 $("codeforces").addEventListener("blur", () => normalizeHandleField("codeforces", "codeforces"));
 $("leetcode").addEventListener("input", updateProfileLinks);
 $("leetcode").addEventListener("blur", () => normalizeHandleField("leetcode", "leetcode"));
-const EMAIL_USERNAME_KEY = "cp-leaderboard.gmail-username";
-$("email").value = localStorage.getItem(EMAIL_USERNAME_KEY) || "";
-$("email").addEventListener("input", () => localStorage.setItem(EMAIL_USERNAME_KEY, $("email").value));
+async function loadClerk() {
+  await new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = CLERK_JS_URL;
+    script.async = true;
+    script.crossOrigin = "anonymous";
+    script.dataset.clerkPublishableKey = CLERK_PUBLISHABLE_KEY;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("Could not load sign-in. Check your connection or ad blocker."));
+    document.head.appendChild(script);
+  });
+  const instance = typeof window.Clerk === "function" ? new window.Clerk(CLERK_PUBLISHABLE_KEY) : window.Clerk;
+  // Match Clerk's sign-in modal to the page's dark tokens.
+  await instance.load({
+    appearance: {
+      variables: {
+        colorBackground: "#161922", colorText: "#e8e8e8", colorTextSecondary: "#999",
+        colorInputBackground: "#0f1115", colorInputText: "#e8e8e8", colorPrimary: "#60a5fa", colorNeutral: "#e8e8e8"
+      }
+    }
+  });
+  return instance;
+}
+function currentUser() {
+  const u = clerk?.user;
+  if (!u) return null;
+  return { id: u.id, email: u.primaryEmailAddress?.emailAddress || "", name: u.fullName || u.username || "" };
+}
 let currentPeriod = "week";
 let profileLoadedFor = null;
 
@@ -155,10 +176,7 @@ async function loadContests() {
 async function loadProfile(user) {
   $("profile").hidden = !user;
   $("logout").hidden = !user;
-  $("google-login").hidden = !GOOGLE_AUTH_ENABLED || Boolean(user);
-  $("github-login").hidden = !GITHUB_AUTH_ENABLED || Boolean(user);
-  $("email-address").hidden = Boolean(user);
-  $("email-login").hidden = Boolean(user);
+  $("login").hidden = Boolean(user);
   if (!user) {
     profileLoadedFor = null;
     $("auth-status").textContent = "";
@@ -178,7 +196,7 @@ async function loadProfile(user) {
   if (profileLoadedFor !== user.id) return;
   const suggestedHandle = (user.email?.split("@")[0] || "").split("+")[0]
     .replace(/[^A-Za-z0-9_.-]/g, "").slice(0, 40);
-  $("name").value = profile?.name || user.user_metadata?.full_name || "";
+  $("name").value = profile?.name || user.name;
   $("codeforces").value = accounts.find(account => account.platform === "codeforces")?.handle || suggestedHandle;
   $("leetcode").value = accounts.find(account => account.platform === "leetcode")?.handle || suggestedHandle;
   updateProfileLinks();
@@ -187,9 +205,6 @@ async function loadProfile(user) {
 }
 
 async function refresh() {
-  const { data: { session }, error } = await supabase.auth.getSession();
-  if (error) showError("auth-status", error);
-  await loadProfile(session?.user || null);
   await Promise.all([showLeaderboard(), loadContests()]);
   const { data: latest } = await supabase.from("snapshots").select("taken_at").order("taken_at", { ascending: false }).limit(1).maybeSingle();
   $("updated").textContent = latest ? `Updated ${new Date(latest.taken_at).toLocaleString()}` : "No snapshots yet";
@@ -205,41 +220,20 @@ for (const [key, label] of Object.entries(PERIODS)) {
 
 if (!configured) {
   $("updated").textContent = "Set the Supabase project URL and anon key in this page to connect.";
-  $("google-login").disabled = true;
-  $("github-login").disabled = true;
-  $("email-login").disabled = true;
   $("board").innerHTML = "<tr><td colspan=\"6\">Supabase configuration required.</td></tr>";
   $("contests").innerHTML = "<tr><td>Supabase configuration required.</td></tr>";
 } else {
-  $("google-login").onclick = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}${window.location.pathname}` }
-    });
-    if (error) showError("auth-status", error);
-  };
-  $("github-login").onclick = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "github", options: { redirectTo: window.location.href.split("#")[0] } });
-    if (error) showError("auth-status", error);
-  };
-  $("email-login").onclick = async () => {
-    const username = $("email").value.trim();
-    if (!username) return setMessage("auth-status", "Enter your Gmail username first.");
-    if (!/^[A-Za-z0-9.]{1,30}$/.test(username)) {
-      return setMessage("auth-status", "Use only letters, numbers, and periods before @gmail.com.");
-    }
-    const email = `${username}@gmail.com`;
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.href.split("#")[0] } });
-    setMessage("auth-status", error ? error.message : "Sign-in link sent. Check your email.");
-  };
+  $("login").onclick = () => clerk?.openSignIn();
   $("logout").onclick = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) showError("auth-status", error);
-    else await refresh();
+    try {
+      await clerk.signOut();
+    } catch (error) {
+      showError("auth-status", error);
+    }
   };
   $("profile-form").onsubmit = async event => {
     event.preventDefault();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = currentUser();
     if (!user) return setMessage("profile-message", "Sign in before saving a profile.");
     const accountsToSave = [
       { platform: "codeforces", inputId: "codeforces" },
@@ -279,8 +273,17 @@ if (!configured) {
     button.disabled = false;
     setMessage("profile-message", "Saved. Handle verification runs with the next stats update.");
   };
-  supabase.auth.onAuthStateChange((_event, session) => loadProfile(session?.user || null));
   refresh();
+  if (!clerkConfigured) {
+    setMessage("auth-status", "Sign-in not configured: set CLERK_PUBLISHABLE_KEY in this page.");
+  } else {
+    loadClerk().then(instance => {
+      clerk = instance;
+      $("login").disabled = false;
+      clerk.addListener(() => loadProfile(currentUser()));
+      return loadProfile(currentUser());
+    }).catch(error => showError("auth-status", error));
+  }
 }
 </script>
 </body>

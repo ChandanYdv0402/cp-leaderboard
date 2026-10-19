@@ -28,19 +28,22 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 - Manually ran the `update` workflow successfully; its Rust build completed and it populated upcoming contests. The production site now shows those contests; there are still no profiles or leaderboard snapshots.
 - Existing `users.toml`, `data/snapshots/`, `site/leaderboard.json`, and `site/contests.json` have not been removed. Keep them until the Supabase flow is configured and verified.
 
+- Switched sign-in from Supabase Auth (Google/email OTP) to Clerk via Supabase third-party auth: `site/index.html` loads clerk-js from jsDelivr, passes the Clerk session token to supabase-js through `accessToken`, and uses Clerk's sign-in modal. `supabase/schema.sql` now uses text user ids and `auth.jwt() ->> 'sub'` in RLS; `supabase/clerk_migration.sql` converts an existing project. The fetcher needed no change (service-role key, string ids).
+
 ## Current Blockers / Unverified
 
-- Google OAuth is wired in the site but requires a Google OAuth client ID and secret in Supabase; email OTP has not been tested end to end. GitHub OAuth remains disabled pending its own OAuth credentials.
+- Supabase Auth (Google OAuth / email OTP) is no longer used by the site; login providers are now configured in Clerk. Clerk sign-in, token acceptance by Supabase, and RLS writes with Clerk ids are untested.
 - No users have signed up or connected handles yet, so per-user snapshots and handle verification remain untested.
 - The fetcher compiled and ran successfully in GitHub Actions. Cargo/Rust is unavailable in the local environment.
 - Local HTTP preview is available at `http://localhost:8000/` in the current session; it uses a PowerShell server because Python is unavailable.
 
 ## Next Steps
 
+0. Clerk: create the app, activate its Supabase integration, add Clerk under Supabase Third-Party Auth, run `supabase/clerk_migration.sql`, and set `CLERK_PUBLISHABLE_KEY`. Until then the site shows "Sign-in not configured". Clerk sign-in end to end is untested.
+
 1. Sign in with email OTP, create the first profile, and connect platform handles.
 2. Run the `update` workflow manually again; verify platform fetches, verification updates, and per-user snapshot writes.
 3. Verify own-profile/account RLS and leaderboard periods. Install/use Rust locally for `cargo fmt` if desired.
-4. Configure a Google OAuth client and enable the Google provider in Supabase; configure GitHub OAuth separately if GitHub sign-in is wanted.
 5. Only after successful verification, decide whether to import or remove the legacy TOML/JSON data.
 
 ## Project Conventions

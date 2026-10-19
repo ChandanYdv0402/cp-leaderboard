@@ -1,11 +1,11 @@
 create table public.profiles (
-  id uuid primary key references auth.users on delete cascade,
+  id text primary key, -- Clerk user id (JWT "sub")
   name text not null unique check (char_length(name) between 2 and 32),
   created_at timestamptz not null default now()
 );
 
 create table public.accounts (
-  user_id uuid not null references public.profiles on delete cascade,
+  user_id text not null references public.profiles on delete cascade,
   platform text not null check (platform in ('codeforces', 'leetcode')),
   handle text not null check (handle ~ '^[A-Za-z0-9_.-]{1,40}$'),
   verified boolean not null default false,
@@ -15,7 +15,7 @@ create table public.accounts (
 
 create table public.snapshots (
   id bigint generated always as identity primary key,
-  user_id uuid not null references public.profiles on delete cascade,
+  user_id text not null references public.profiles on delete cascade,
   taken_at timestamptz not null default now(),
   points integer not null,
   solved integer not null,
@@ -49,13 +49,13 @@ create policy "public read contests" on public.contests
   for select using (true);
 
 create policy "users insert own profile" on public.profiles
-  for insert to authenticated with check (auth.uid() = id);
+  for insert to authenticated with check ((select auth.jwt() ->> 'sub') = id);
 create policy "users update own profile" on public.profiles
-  for update to authenticated using (auth.uid() = id) with check (auth.uid() = id);
+  for update to authenticated using ((select auth.jwt() ->> 'sub') = id) with check ((select auth.jwt() ->> 'sub') = id);
 create policy "users manage own accounts" on public.accounts
   for all to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.jwt() ->> 'sub') = user_id)
+  with check ((select auth.jwt() ->> 'sub') = user_id);
 
 grant select on public.profiles, public.accounts, public.snapshots, public.contests to anon, authenticated;
 grant insert, update on public.profiles to authenticated;
