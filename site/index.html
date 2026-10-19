@@ -14,7 +14,8 @@
   .board-bar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
   .filters { display:flex; gap:12px; margin-left:auto; }
   .filters label { display:flex; align-items:center; gap:6px; }
-  select { font:inherit; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 8px; }
+  .filters select { font-size:15px; }
+  select { font:inherit; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 12px; }
   button, input { font:inherit } button { cursor:pointer }
   .auth, .profile { border-bottom:1px solid var(--line); padding:16px 0; }
   .auth { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
@@ -26,7 +27,7 @@
   button:disabled { opacity:.55; cursor:wait }
   .message { min-height:1.5em; margin:8px 0 0; color:var(--muted); font-size:13px; }
   table { width:100%; border-collapse:collapse; margin:12px 0 32px } th,td { text-align:left; padding:8px; border-bottom:1px solid var(--line) }
-  td.n { text-align:right; font-variant-numeric:tabular-nums } a { color:var(--accent) }
+  th.n, td.n { text-align:right; font-variant-numeric:tabular-nums; width:5.5em } th.rank { width:2em } a { color:var(--accent) }
   @media (max-width:600px) { .profile form { grid-template-columns:1fr; } table { font-size:13px; } th,td { padding:7px 5px; } }
 </style>
 </head>
@@ -69,7 +70,7 @@
     </label>
   </div>
 </div>
-<table><thead><tr><th>#</th><th>Name</th><th>Points</th><th>Solved</th><th id="cf-head">CF</th><th id="lc-head">LC</th></tr></thead><tbody id="board"></tbody></table>
+<table><thead><tr><th class="rank">#</th><th>Name</th><th class="n">Points</th><th class="n">Solved</th><th class="n" id="cf-head">CF</th><th class="n" id="lc-head">LC</th></tr></thead><tbody id="board"></tbody></table>
 <h2>Upcoming contests</h2>
 <table><tbody id="contests"></tbody></table>
 <script type="module">
