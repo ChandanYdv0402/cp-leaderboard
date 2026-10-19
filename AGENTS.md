@@ -32,6 +32,8 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 
 - Added Platform (All/LeetCode/Codeforces) and Sort by (Score/Questions solved/Rating) dropdowns. `leaderboard(days)` now also returns `cf_points`, `cf_solved`, `lc_points`, `lc_solved` derived from snapshot `stats` JSON; `supabase/leaderboard_by_platform.sql` drops and recreates it for existing projects. Until it is run, per-platform values show as "–".
 
+- Added RPG party sprites (branch `feat/rank-badges`): `site/index.html` composes a 24x32 pixel character per tier from layered parts (`BODY`, `GEAR`, `SPRITES`), e.g. LC Knight = plumed helm + sword + shield, CF Candidate Master = wizard. Rank cards show both platform characters with XP bars; the legend, table avatars and chart labels use the tier character (portrait crop). Standings bars are segmented like XP bars; Progress lines are stepped with a portrait on each player's latest point. Verified locally only.
+
 ## Current Blockers / Unverified
 
 - Supabase Auth (Google OAuth / email OTP) is no longer used by the site; login providers are now configured in Clerk. Clerk sign-in, token acceptance by Supabase, and RLS writes with Clerk ids are untested.
