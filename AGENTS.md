@@ -18,23 +18,24 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 - Set the Supabase Site URL to the GitHub Pages URL and added the Pages and `http://localhost:8000/` auth redirects.
 - Email auth and new-user signups are enabled. The GitHub sign-in button stays hidden until GitHub OAuth credentials are configured.
 - The local site connected to this Supabase project successfully; leaderboard and contest queries returned their expected empty states because no accounts or snapshots exist yet.
-- Added the non-sensitive `SUPABASE_URL` GitHub Actions secret. The `SUPABASE_SERVICE_ROLE_KEY` secret is not configured; it must be entered directly in GitHub and must never be exposed in chat or committed.
+- Added the non-sensitive `SUPABASE_URL` and sensitive `SUPABASE_SERVICE_ROLE_KEY` as GitHub Actions secrets. Never expose the service-role key in chat or commit it.
 - Pushed the Supabase browser configuration; the Pages workflow completed successfully and the production site returned the expected empty leaderboard/contest states.
+- Manually ran the `update` workflow successfully; its Rust build completed and it populated upcoming contests. The production site now shows those contests; there are still no profiles or leaderboard snapshots.
 - Existing `users.toml`, `data/snapshots/`, `site/leaderboard.json`, and `site/contests.json` have not been removed. Keep them until the Supabase flow is configured and verified.
 
 ## Current Blockers / Unverified
 
 - GitHub OAuth is disabled pending a GitHub OAuth app's client ID and secret; email OTP has not been tested end to end.
-- GitHub Actions secret `SUPABASE_SERVICE_ROLE_KEY` still needs to be configured by the repository owner.
-- The fetcher has not been compiled or run: Cargo/Rust is unavailable in the current environment.
+- No users have signed up or connected handles yet, so per-user snapshots and handle verification remain untested.
+- The fetcher compiled and ran successfully in GitHub Actions. Cargo/Rust is unavailable in the local environment.
 - Local HTTP preview is available at `http://localhost:8000/` in the current session; it uses a PowerShell server because Python is unavailable.
 
 ## Next Steps
 
-1. Add `SUPABASE_SERVICE_ROLE_KEY` as a GitHub Actions secret. Never put the service-role key in browser code or commit it.
-2. Sign in with email OTP, create the first profile, and connect platform handles.
-3. Run the `update` workflow manually; verify its Rust build, platform fetches, verification updates, snapshot writes, and contest writes.
-4. Verify own-profile/account RLS, leaderboard periods, contest display, and both Actions workflows. Install/use Rust locally for `cargo fmt` and `cargo check` if desired.
+1. Sign in with email OTP, create the first profile, and connect platform handles.
+2. Run the `update` workflow manually again; verify platform fetches, verification updates, and per-user snapshot writes.
+3. Verify own-profile/account RLS and leaderboard periods. Install/use Rust locally for `cargo fmt` if desired.
+4. Configure a GitHub OAuth app and enable the GitHub provider if GitHub sign-in is wanted.
 5. Only after successful verification, decide whether to import or remove the legacy TOML/JSON data.
 
 ## Project Conventions
