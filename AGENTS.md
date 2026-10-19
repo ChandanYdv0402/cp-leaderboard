@@ -14,6 +14,7 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 - Email sign-in takes a Gmail username and appends the visible `@gmail.com` suffix.
 - The Gmail username draft persists locally across reloads; on first sign-in, empty platform handle fields default to the sanitized email prefix and remain editable.
 - Each editable Codeforces/LeetCode handle accepts a username or public profile URL, normalizes supported URLs to usernames, and links to the corresponding public profile page.
+- Pushed expanded profile URL handling in commit `ec96a86`; the Pages workflow completed successfully and production shows 200-character handle inputs. Local checks normalized `https://codeforces.com/profile/BihariBull0402` to `BihariBull0402` and a LeetCode `/u/` URL to its username.
 - Split Actions into a scheduled Supabase fetcher (`.github/workflows/update.yml`) and a Pages deployment workflow (`.github/workflows/pages.yml`).
 - Updated `README.md` with setup instructions.
 - Created Supabase project `ttcbdfmwsywdgjcwsllf` and successfully ran `supabase/schema.sql` in its SQL Editor.
