@@ -19,6 +19,7 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 - Email auth and new-user signups are enabled. The GitHub sign-in button stays hidden until GitHub OAuth credentials are configured.
 - The local site connected to this Supabase project successfully; leaderboard and contest queries returned their expected empty states because no accounts or snapshots exist yet.
 - Added the non-sensitive `SUPABASE_URL` GitHub Actions secret. The `SUPABASE_SERVICE_ROLE_KEY` secret is not configured; it must be entered directly in GitHub and must never be exposed in chat or committed.
+- Pushed the Supabase browser configuration; the Pages workflow completed successfully and the production site returned the expected empty leaderboard/contest states.
 - Existing `users.toml`, `data/snapshots/`, `site/leaderboard.json`, and `site/contests.json` have not been removed. Keep them until the Supabase flow is configured and verified.
 
 ## Current Blockers / Unverified
@@ -31,9 +32,9 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 ## Next Steps
 
 1. Add `SUPABASE_SERVICE_ROLE_KEY` as a GitHub Actions secret. Never put the service-role key in browser code or commit it.
-2. Test email OTP sign-in. Configure a GitHub OAuth app and enable the GitHub provider if GitHub sign-in is wanted.
-3. Install/use the Rust toolchain, run formatting and `cargo check`, then run the fetcher against this Supabase project.
-4. Verify own-profile/account RLS, handle verification, leaderboard periods, contest display, and both Actions workflows.
+2. Sign in with email OTP, create the first profile, and connect platform handles.
+3. Run the `update` workflow manually; verify its Rust build, platform fetches, verification updates, snapshot writes, and contest writes.
+4. Verify own-profile/account RLS, leaderboard periods, contest display, and both Actions workflows. Install/use Rust locally for `cargo fmt` and `cargo check` if desired.
 5. Only after successful verification, decide whether to import or remove the legacy TOML/JSON data.
 
 ## Project Conventions
