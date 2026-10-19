@@ -4,84 +4,411 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CP Leaderboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
-  :root { color-scheme:dark; --bg:#0f1115; --fg:#e8e8e8; --muted:#999; --line:#2a2d35; --accent:#60a5fa; }
-  body { background:var(--bg); color:var(--fg); font:15px/1.5 system-ui,sans-serif; max-width:1440px; margin:0 auto; padding:24px clamp(16px, 3vw, 40px); }
+  /* 8-bit look (after 8bitcn/ui): grayscale, square corners, pixel font for chrome, stepped pixel borders.
+     Palette and fonts live here; charts read these too. */
+  :root {
+    color-scheme:dark;
+    --bg:#070707; --panel:#121212; --head:#1a1a1a; --row:#0f0f0f; --hover:#1c1c1c;
+    --fg:#f5f5f5; --muted:#a3a3a3; --faint:#6b6b6b; --line:#262626; --rail:rgba(255,255,255,.1);
+    --primary:#e4e4e4; --primary-fg:#121212; --ring:#737373;
+    --cf:#5fa8d3; --lc:#e0a43a; --all:#c9c9c9; --gold:#d4b33a; --hot:#ff4d4d;
+    --pixel:"Press Start 2P", ui-monospace, monospace;
+    --text:ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --chart-font:ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing:border-box }
+  [hidden] { display:none !important }
+  html { background:var(--bg); }
+  /* Centered column with dashed side rails */
+  body { background:var(--bg); color:var(--fg); font:13px/1.6 var(--text); max-width:1400px; min-height:100vh; margin:0 auto; padding:0 clamp(14px, 3vw, 28px) 24px; border-left:1px dashed var(--rail); border-right:1px dashed var(--rail); -webkit-font-smoothing:antialiased; }
+  a { color:var(--fg); text-decoration:underline; text-decoration-style:dotted; text-underline-offset:3px; text-decoration-color:var(--ring); }
+  a:hover { text-decoration-style:solid; text-decoration-color:var(--fg); }
+  button, input, select { font:inherit; color:var(--fg); }
+  button { cursor:pointer; }
+  button:disabled { opacity:.5; cursor:wait; }
+  :focus-visible { outline:2px solid var(--ring); outline-offset:3px; }
+  .muted { color:var(--muted); }
+
+  /* Stepped "pixel" outline: four offset shadows leave the corners notched. */
+  /* Declared on every element so var(--px-c) resolves per element, not once on :root. */
+  * { --px-frame:0 -4px 0 0 var(--px-c, var(--line)), 0 4px 0 0 var(--px-c, var(--line)), -4px 0 0 0 var(--px-c, var(--line)), 4px 0 0 0 var(--px-c, var(--line)); }
+  .px { --px-c:var(--line); box-shadow:var(--px-frame); }
+
+  /* Header */
+  .topbar { display:flex; align-items:center; gap:20px; flex-wrap:wrap; padding:18px 0; border-bottom:1px dashed var(--rail); margin-bottom:32px; }
+  .brand { margin:0; font:14px/1.4 var(--pixel); letter-spacing:.5px; }
+  .status { display:flex; gap:10px; flex-wrap:wrap; color:var(--muted); font:8px/1.8 var(--pixel); letter-spacing:.5px; }
+  .status .sep { color:var(--faint); }
+  .dot { display:inline-block; width:6px; height:6px; background:#4ade80; margin-right:6px; vertical-align:0; }
+  .auth { margin-left:auto; display:flex; align-items:center; gap:14px; font-size:12px; }
+  .btn { --px-c:var(--primary); background:var(--primary); color:var(--primary-fg); border:0; border-radius:0; padding:7px 14px; margin:4px; font:9px/1.4 var(--pixel); letter-spacing:.5px; transition:transform .08s; box-shadow:var(--px-frame); }
+  .btn:hover:not(:disabled) { --px-c:#ffffff; background:#ffffff; }
+  .btn:active:not(:disabled) { transform:translateY(2px); }
+
+  /* Panels: dark cards with a notched pixel border and a title strip */
+  .panel { --px-c:var(--line); position:relative; background:var(--panel); margin:4px 4px 36px; padding-bottom:14px; box-shadow:var(--px-frame); }
+  .panel-title { margin:0 0 14px; padding:12px 14px; background:var(--head); border-bottom:1px dashed var(--rail); font:10px/1.4 var(--pixel); letter-spacing:.5px; }
+  .panel > :not(.panel-title) { margin-left:14px; margin-right:14px; }
+  .panel > table { width:calc(100% - 28px); }
+  .col { min-width:0; }
+
   /* Wide screens: leaderboard and contests side by side; stacked below 1000px. */
-  .layout { display:grid; grid-template-columns:minmax(0,3fr) minmax(0,2fr); gap:40px; align-items:start; }
+  .layout { display:grid; grid-template-columns:minmax(0,3fr) minmax(0,2fr); gap:24px; align-items:start; }
   @media (max-width:1000px) { .layout { grid-template-columns:1fr; gap:0; } }
-  header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
-  h1 { margin:0 0 4px } h2 { margin-top:28px } .muted { color:var(--muted); font-size:13px }
-  .tabs button { background:none; border:1px solid var(--line); color:var(--fg); padding:6px 12px; border-radius:6px; cursor:pointer; margin-right:6px }
-  .tabs button.on { border-color:var(--accent); color:var(--accent) }
+
+  /* Pixel tabs: active one inverted */
+  .tabs { --px-c:var(--ring); display:inline-flex; flex-wrap:wrap; gap:2px; padding:3px; margin:4px; background:var(--bg); box-shadow:var(--px-frame); }
+  .tabs button { background:none; border:0; border-radius:0; color:var(--muted); padding:7px 12px; font:8.5px/1.4 var(--pixel); letter-spacing:.5px; }
+  .tabs button:hover { color:var(--fg); }
+  .tabs button.on { background:#262626; color:var(--fg); cursor:default; }
   .board-bar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
-  .filters { display:flex; flex-wrap:wrap; gap:12px; margin-left:auto; }
-  .filters label { display:flex; align-items:center; gap:6px; white-space:nowrap; }
-  .filters select { font-size:15px; }
-  select { font:inherit; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 12px; }
-  button, input { font:inherit } button { cursor:pointer }
-  .auth, .profile { border-bottom:1px solid var(--line); padding:16px 0; }
-  .auth { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
-  .profile form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; align-items:end; }
-  label { display:grid; gap:4px; color:var(--muted); font-size:13px; }
-  .profile-link { font-size:13px; }
-  input { min-width:0; padding:7px 8px; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:4px; }
-  button.action { padding:7px 10px; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:4px; }
-  button:disabled { opacity:.55; cursor:wait }
-  .message { min-height:1.5em; margin:8px 0 0; color:var(--muted); font-size:13px; }
-  table { width:100%; border-collapse:collapse; margin:12px 0 32px } th,td { text-align:left; padding:8px; border-bottom:1px solid var(--line) }
-  th.n, td.n { text-align:right; font-variant-numeric:tabular-nums; width:5.5em } th.rank { width:2em } a { color:var(--accent) }
-  @media (max-width:600px) { .profile form { grid-template-columns:1fr; } table { font-size:13px; } th,td { padding:7px 5px; } }
+  .filters { display:flex; flex-wrap:wrap; gap:14px; margin-left:auto; }
+  .filters label { display:flex; align-items:center; gap:8px; white-space:nowrap; color:var(--muted); font:8px/1.4 var(--pixel); letter-spacing:.5px; }
+  select { background:var(--bg); border:2px solid var(--line); border-radius:0; padding:5px 6px; font:8.5px/1.4 var(--pixel); cursor:pointer; }
+  select:hover { border-color:var(--ring); }
+  .chart-bar { display:flex; align-items:center; gap:10px; margin-top:16px; padding-top:14px; border-top:1px dashed var(--rail); }
+  .chart-bar::before { content:"CHART"; color:var(--faint); font:8px/1 var(--pixel); }
+  /* Chart screen: stepped pixel frame and faint scanlines */
+  .screen { --px-c:var(--line); background:repeating-linear-gradient(0deg, rgba(255,255,255,.022) 0 1px, transparent 1px 3px), var(--bg); box-shadow:var(--px-frame); }
+  .chart-wrap { position:relative; margin:16px 4px 0; padding:14px 12px 10px; }
+  .chart-note { color:var(--faint); font-size:12px; margin:8px 0 0; }
+
+  /* Tables */
+  table { width:100%; border-collapse:collapse; margin-top:16px; font-variant-numeric:tabular-nums; }
+  th { text-align:left; font:7.5px/1.4 var(--pixel); letter-spacing:.5px; text-transform:uppercase; color:var(--faint); padding:10px 10px; border-bottom:2px solid var(--line); }
+  td { padding:9px 10px; border-bottom:1px dashed var(--line); }
+  tbody tr:hover td { background:var(--hover); }
+  th.n, td.n { text-align:right; width:6em; } th.rank, td.rank { width:3.5em; }
+  td.n { font-family:var(--chart-font); font-size:12.5px; }
+  td.rank { color:var(--faint); font:9px/1 var(--pixel); }
+  tr.first td.rank { color:var(--gold); } tr.second td.rank { color:#c0c6cf; } tr.third td.rank { color:#c98a55; }
+  td.empty { color:var(--faint); text-align:center; padding:20px; font:8px/1.6 var(--pixel); }
+  .tag { display:inline-block; font:7px/1 var(--pixel); padding:4px 5px 3px; color:#0b0b0b; }
+  .tag.cf { background:var(--cf); } .tag.lc { background:var(--lc); }
+  td.when { color:var(--muted); white-space:nowrap; font-family:var(--chart-font); font-size:12px; }
+
+  /* Profile form */
+  .profile form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)) auto; gap:16px; align-items:end; }
+  label { display:grid; gap:8px; color:var(--muted); font:8px/1.4 var(--pixel); letter-spacing:.5px; }
+  input { min-width:0; padding:8px 10px; margin:3px; background:#1a1a1a; border:0; border-radius:0; font:11px/1.4 var(--pixel); letter-spacing:.5px;
+    box-shadow:0 -3px 0 0 var(--ring), 0 3px 0 0 var(--ring), -3px 0 0 0 var(--ring), 3px 0 0 0 var(--ring); }
+  input:focus { outline:none; background:#222; }
+  .profile-link { font:12px/1.4 var(--text); letter-spacing:0; }
+  .message { min-height:1.5em; margin:12px 0 0; color:var(--muted); font-size:12px; }
+
+  /* Footer */
+  .statusbar { display:flex; gap:8px 22px; flex-wrap:wrap; justify-content:space-between; color:var(--faint); font:7.5px/2 var(--pixel); letter-spacing:.5px; border-top:1px dashed var(--rail); padding-top:16px; }
+  .statusbar a { color:var(--muted); }
+  kbd { font:inherit; color:var(--fg); background:var(--head); padding:2px 4px; }
+
+  /* Brand + hero graphic */
+  .brand { display:flex; align-items:center; gap:10px; }
+  .brand-icon svg { display:block; }
+  .hero { display:flex; align-items:flex-end; justify-content:center; gap:clamp(16px, 5vw, 64px); padding:8px 0 30px; margin-bottom:32px; border-bottom:1px dashed var(--rail); text-align:center; }
+  .hero-center { display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .hero h2 { margin:0; font:clamp(14px, 3vw, 26px)/1.5 var(--pixel); letter-spacing:1px; }
+  .hero p { margin:0; color:var(--muted); font:clamp(7px, 1.2vw, 9px)/1.8 var(--pixel); letter-spacing:.5px; }
+  .hero .side { opacity:.9; }
+  .hero .bob { animation:bob 2.4s steps(2) infinite; }
+  @keyframes bob { 50% { transform:translateY(-4px) } }
+  @media (prefers-reduced-motion:reduce) { .hero .bob, .sprite, .spin rect { animation:none !important; opacity:1 !important } }
+
+  /* Pixel avatar next to names */
+  .avatar { display:inline-block; vertical-align:-3px; margin-right:9px; image-rendering:pixelated; }
+  td.name { white-space:nowrap; }
+
+  /* 8-bit spinner: eight pixels lighting in turn */
+  .spin { display:inline-block; width:14px; height:14px; vertical-align:-2px; color:var(--fg); }
+  .spin rect { animation:spin-px .8s linear infinite; opacity:0; }
+  @keyframes spin-px { 0% { opacity:1 } 100% { opacity:0 } }
+  .loading { display:flex; align-items:center; justify-content:center; gap:10px; color:var(--faint); font:8px/1.6 var(--pixel); padding:18px; }
+
+  /* Segmented XP / progress bar */
+  .xp { --c:var(--primary); position:relative; height:14px; margin:3px; background:#1a1a1a; flex:1; min-width:60px;
+    box-shadow:0 -3px 0 0 var(--line), 0 3px 0 0 var(--line), -3px 0 0 0 var(--line), 3px 0 0 0 var(--line); }
+  .xp i { position:absolute; inset:2px auto 2px 2px; width:calc((100% - 4px) * var(--p, 0)); background:repeating-linear-gradient(90deg, var(--c) 0 6px, transparent 6px 8px); transition:width .4s steps(8); }
+  .xp-sm { height:10px; min-width:70px; max-width:90px; }
+  .sync { display:flex; align-items:center; gap:8px; color:var(--faint); font:7.5px/1 var(--pixel); }
+
+  /* Ranks panel: player cards + legend */
+  .ranks { display:grid; grid-template-columns:minmax(0,1fr) 220px; gap:22px; align-items:start; }
+  .rank-cards { display:grid; gap:18px; }
+  .rank-card { margin:4px; padding:12px; }
+  .rank-card h3 { display:flex; align-items:center; margin:0 0 10px; font:9px/1.4 var(--pixel); }
+  /* Party slots: label + XP bar over a full pixel character, like an RPG party screen */
+  .party { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:18px; }
+  .hero-slot { min-width:0; }
+  .slot-head { display:flex; justify-content:space-between; gap:8px; font:7.5px/1.4 var(--pixel); color:var(--muted); white-space:nowrap; }
+  .slot-head b { color:var(--c); font-weight:normal; }
+  .hero-slot .xp { margin:8px 3px 10px; }
+  .slot-art { display:flex; justify-content:center; padding-top:6px; }
+  .sprite { image-rendering:pixelated; animation:bob 2.4s steps(2) infinite; }
+  .hero-slot:nth-child(2) .sprite { animation-delay:-1.2s; }
+  .hero-slot.unrated .sprite { filter:grayscale(1) brightness(.35); animation:none; }
+  .sprite-sm { image-rendering:pixelated; }
+  .legend h4 { margin:0 0 8px; font:8px/1.4 var(--pixel); color:var(--muted); }
+  .legend ul { list-style:none; margin:0 0 18px; padding:0; display:grid; gap:6px; }
+  .legend li { display:grid; grid-template-columns:24px 1fr auto; align-items:center; gap:8px; font-size:11.5px; }
+  .legend li span:last-child { color:var(--faint); font-family:var(--chart-font); font-size:11px; }
+  .legend p { margin:0; color:var(--faint); font-size:11px; }
+
+  /* Head-on alert: hazard-striped strip that blinks while two players are neck and neck */
+  .alert { --px-c:var(--hot); display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:0 4px 30px; padding:10px 14px; box-shadow:var(--px-frame);
+    background:repeating-linear-gradient(45deg, #2a0b0b 0 10px, #170606 10px 20px); font:8.5px/1.8 var(--pixel); letter-spacing:.5px; }
+  .alert .bang { display:inline-grid; place-items:center; width:24px; height:24px; background:var(--hot); color:#000; font:13px/1 var(--pixel); animation:blink .7s steps(2) infinite; }
+  .alert strong { color:var(--hot); font-weight:normal; animation:blink 1.4s steps(2) infinite; }
+  .alert b { color:var(--fg); font-weight:normal; }
+  .alert .btn { margin-left:auto; --px-c:var(--hot); background:var(--hot); color:#000; }
+  @keyframes blink { 50% { opacity:.25 } }
+
+  /* Duel arena */
+  .arena .panel-title { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .arena .panel-title small { color:var(--hot); font-size:8px; }
+  .arena-bar { display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap; }
+  .arena-bar select { min-width:12em; padding:8px; }
+  .arena-bar .btn-ghost { padding:6px 10px; }
+  .ring { position:relative; display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:end; gap:18px; margin:22px 4px 0; padding:18px 20px 0; overflow:hidden; }
+  .ring .spark { position:absolute; width:4px; height:4px; background:var(--gold); animation:blink 1.2s steps(2) infinite; }
+  .ring .spark:nth-child(3n) { background:#fff; width:2px; height:2px; }
+  .floor { grid-column:1 / -1; height:30px; margin:0 -20px; border-top:4px solid #2a2a2a;
+    background:repeating-linear-gradient(90deg, #1b1b1b 0 16px, #121212 16px 32px); }
+  .fighter { --c:var(--fg); min-width:0; display:grid; gap:7px; position:relative; z-index:1; }
+  .fighter.right { text-align:right; }
+  .f-name { font:12px/1.4 var(--pixel); color:var(--c); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .f-name small { color:var(--muted); font-size:8px; margin:0 8px; }
+  .f-tier { font:7.5px/1.4 var(--pixel); }
+  .bar-row { display:flex; justify-content:space-between; font:7px/1.4 var(--pixel); color:var(--muted); margin-top:4px; }
+  .xp .lbl { position:absolute; inset:0; display:grid; place-items:center; font:7px/1 var(--pixel); color:#fff;
+    text-shadow:1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000; }
+  .xp.hp { --c:#ff4d4d; } .xp.gold { --c:#d4a72c; }
+  .fighter.right .xp i { inset:2px 2px 2px auto; }
+  .f-art { display:flex; justify-content:center; padding-top:10px; }
+  .f-art svg { width:clamp(84px, 16vw, 132px); height:auto; }
+  .fighter.right .f-art .flip { transform:scaleX(-1); }
+  .fighter.left .f-art { animation:enter-l .5s steps(5) both; }
+  .fighter.right .f-art { animation:enter-r .5s steps(5) both; }
+  .fighter.unrated .sprite { filter:grayscale(1) brightness(.35); animation:none; }
+  @keyframes enter-l { from { transform:translateX(-80px) } }
+  @keyframes enter-r { from { transform:translateX(80px) } }
+  .vs { display:grid; justify-items:center; gap:14px; align-self:center; padding-bottom:30px; position:relative; z-index:1; }
+  .vs-text { font:clamp(28px, 5vw, 46px)/1 var(--pixel); color:var(--gold); text-shadow:4px 4px 0 #8f1414, 8px 8px 0 #000; animation:vs-pop .6s steps(3) both; }
+  @keyframes vs-pop { from { transform:scale(2.6) } }
+  .verdict { --px-c:var(--ring); max-width:15em; padding:8px 10px; margin:4px; background:var(--head); box-shadow:var(--px-frame); font:8px/1.7 var(--pixel); text-align:center; }
+  .verdict.hot { --px-c:#ffd34d; background:var(--hot); color:#000; animation:shake .3s steps(2) infinite; }
+  .verdict.win { --px-c:var(--gold); color:var(--gold); }
+  @keyframes shake { 50% { transform:translate(2px, -1px) rotate(-1.5deg) } }
+  .tug { display:grid; gap:12px; margin:24px 4px 0; }
+  .tug-head { display:flex; justify-content:center; gap:18px; font:9px/1.4 var(--pixel); color:var(--muted); }
+  .tug-head b { color:var(--gold); font-weight:normal; }
+  .tug-row { display:grid; grid-template-columns:8em minmax(0,1fr) 8em minmax(0,1fr) 8em; align-items:center; gap:10px; font:8px/1.4 var(--pixel); white-space:nowrap; }
+  .tug-row .v { color:var(--muted); } .tug-row .v:last-child { text-align:right; }
+  .tug-row .v.won { color:var(--gold); } .tug-row .v svg { vertical-align:-1px; margin:0 6px; }
+  .tug-row .lab { text-align:center; color:var(--faint); font-size:7px; }
+  .tug-bar { position:relative; height:12px; background:#1a1a1a; }
+  .tug-bar i { position:absolute; top:2px; bottom:2px; width:calc((100% - 4px) * var(--p, 0)); background:repeating-linear-gradient(90deg, var(--c) 0 6px, transparent 6px 8px); transition:width .4s steps(8); }
+  .tug-bar.l i { right:2px; } .tug-bar.r i { left:2px; }
+  .dialog { display:grid; gap:14px; margin:26px 4px 0; }
+  .say { display:flex; gap:12px; align-items:flex-start; }
+  .say.r { flex-direction:row-reverse; text-align:right; }
+  .say .pic { --px-c:var(--c); flex:none; margin:4px; padding:4px; background:var(--bg); box-shadow:var(--px-frame); }
+  .say .pic svg { display:block; margin:0; }
+  .bubble { --px-c:var(--ring); margin:4px; padding:10px 14px; background:var(--bg); box-shadow:var(--px-frame); font:8px/2 var(--pixel); max-width:38em; }
+  .bubble b { display:block; color:var(--c); font-weight:normal; }
+  .say:last-child .bubble::after { content:""; display:inline-block; width:6px; height:9px; margin-left:6px; vertical-align:-1px; background:currentColor; animation:blink .8s steps(2) infinite; }
+  .duel-chart { position:relative; height:230px; margin:26px 4px 0; padding:14px 12px 10px; }
+  @media (prefers-reduced-motion:reduce) { .alert *, .ring *, .vs-text, .verdict, .f-art, .bubble::after { animation:none !important; opacity:1 !important; } }
+  @media (max-width:600px) {
+    .ring { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; padding:14px 10px 0; } .floor { margin:0 -10px; }
+    .vs { grid-column:1 / -1; order:-1; grid-auto-flow:column; align-items:center; gap:16px; padding-bottom:4px; }
+    .vs-text { font-size:26px; } .verdict { font-size:7px; max-width:none; }
+    .f-name { font-size:9px; } .f-art svg { width:84px; }
+    .tug-row { grid-template-columns:7em minmax(0,1fr) minmax(0,1fr) 7em; gap:4px 6px; font-size:7px; }
+    .tug-row .lab { grid-column:1 / -1; order:-1; }
+    .tug-head { gap:10px; font-size:7.5px; }
+  }
+
+  /* Calendar (8-bit Calendar component look) */
+  .calendar { margin:4px 4px 0; padding:12px; }
+  .cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; font:9px/1 var(--pixel); }
+  .cal-nav { width:22px; height:22px; padding:0; background:none; border:2px solid var(--ring); color:var(--fg); font:9px/1 var(--pixel); }
+  .cal-nav:hover { background:var(--head); }
+  .cal-grid { display:grid; grid-template-columns:repeat(7, 1fr); gap:2px; text-align:center; }
+  .cal-grid .dow { color:var(--faint); font:7px/2.4 var(--pixel); }
+  .cal-cell { position:relative; aspect-ratio:1.15; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; background:none; border:0; padding:0; color:var(--fg); font:9px/1 var(--pixel); }
+  .cal-cell.out { color:#3d3d3d; }
+  .cal-cell.today { background:var(--primary); color:var(--primary-fg); }
+  .cal-cell.has { cursor:pointer; } .cal-cell.has:hover { background:var(--head); } .cal-cell.today.has:hover { background:#fff; }
+  .cal-cell.sel { outline:2px solid var(--ring); outline-offset:-2px; }
+  .marks { display:flex; gap:3px; height:5px; }
+  .marks b { width:5px; height:5px; } .marks .cf { background:var(--cf); } .marks .lc { background:var(--lc); }
+  .cal-legend { display:flex; gap:14px; margin-top:12px; color:var(--faint); font:7px/1 var(--pixel); }
+  .cal-legend b { display:inline-block; width:7px; height:7px; margin-right:6px; vertical-align:-1px; }
+  .cal-day { margin-top:14px; font-size:12px; }
+  .cal-day h4 { margin:0 0 6px; font:8px/1.4 var(--pixel); color:var(--muted); }
+  .cal-day ul { list-style:none; margin:0; padding:0; display:grid; gap:6px; }
+  .cal-day li { display:flex; gap:8px; align-items:center; }
+  .cal-day time { color:var(--faint); font-family:var(--chart-font); font-size:11.5px; }
+
+  /* Sign-in dialog (8-bit card) */
+  dialog.signin { padding:0; border:0; background:transparent; color:var(--fg); max-width:min(380px, calc(100vw - 32px)); width:100%; overflow:visible; }
+  dialog.signin::backdrop { background:rgba(0,0,0,.75); }
+  .dlg { --px-c:var(--ring); margin:6px; padding:20px; background:var(--panel); box-shadow:var(--px-frame); }
+  .dlg-head { display:flex; justify-content:space-between; align-items:center; }
+  .dlg-head h2 { margin:0; font:13px/1.4 var(--pixel); }
+  .dlg-sub { margin:10px 0 18px; color:var(--muted); font:8px/1.9 var(--pixel); }
+  .x { background:none; border:0; color:var(--muted); font:18px/1 var(--pixel); padding:0 4px; }
+  .x:hover { color:var(--fg); }
+  .oauth { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .btn-ghost { --px-c:var(--ring); background:transparent; color:var(--fg); }
+  .btn-ghost:hover:not(:disabled) { --px-c:var(--fg); background:var(--head); }
+  .or { display:flex; align-items:center; gap:10px; margin:18px 0; color:var(--faint); font:7px/1 var(--pixel); }
+  .or::before, .or::after { content:""; flex:1; border-top:1px dashed var(--line); }
+  .signin form { display:grid; gap:14px; }
+  .signin label { color:var(--fg); font-size:8.5px; }
+  .signin label span { color:var(--muted); }
+  .dlg-row { display:flex; align-items:center; gap:14px; }
+  .linkbtn { background:none; border:0; padding:0; color:var(--muted); font:7.5px/1.4 var(--pixel); text-decoration:underline dotted; text-underline-offset:3px; }
+  .linkbtn:hover { color:var(--fg); }
+  .btn .spin { color:inherit; margin-right:8px; width:10px; height:10px; }
+  #clerk-captcha:empty { display:none; }
+
+  @media (max-width:1100px) { .ranks { grid-template-columns:1fr; } }
+  @media (max-width:600px) {
+    .hero .side { display:none; }
+    .sync { display:none; }
+    .party { gap:12px; } .slot-head { flex-direction:column; gap:4px; }
+    .profile form { grid-template-columns:1fr; }
+    .auth { margin-left:0; }
+    th, td { padding:8px 5px; } td { font-size:12px; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <div><h1>CP Leaderboard</h1><div class="muted" id="updated">Connecting...</div></div>
-  <div class="muted" id="auth-status" aria-live="polite"></div>
+<header class="topbar">
+  <h1 class="brand"><span id="brand-icon" class="brand-icon"></span>cp-leaderboard</h1>
+  <div class="status">
+    <span><span class="dot" aria-hidden="true"></span><span id="updated">Connecting…</span></span>
+    <span class="sep">·</span><span id="user-count">– users</span>
+  </div>
+  <div class="sync" title="Stats refresh every 6 hours (GitHub Actions may start a few minutes late)">
+    <span>Next sync</span><div class="xp xp-sm" id="sync-bar"><i></i></div><span id="sync-left">–</span>
+  </div>
+  <div class="auth" aria-label="Account">
+    <span class="muted" id="auth-status" aria-live="polite"></span>
+    <button class="btn" id="login" disabled>Sign in</button>
+    <button class="btn" id="logout" hidden>Log out</button>
+  </div>
 </header>
-<section class="auth" aria-label="Account">
-  <button class="action" id="login" disabled>Sign in</button>
-  <button class="action" id="logout" hidden>Log out</button>
+<div class="alert" id="alert" role="status" hidden></div>
+<section class="hero" id="hero" aria-label="CP Leaderboard"></section>
+<section class="panel arena" id="arena" hidden>
+  <h2 class="panel-title"><span>Duel Arena</span><small id="arena-round"></small></h2>
+  <div class="arena-bar">
+    <select id="duel-a" aria-label="Left fighter"></select>
+    <button class="btn btn-ghost" id="duel-swap" title="Swap sides">Swap</button>
+    <select id="duel-b" aria-label="Right fighter"></select>
+    <button class="btn" id="duel-shuffle">Random duel</button>
+  </div>
+  <div class="ring screen" id="ring"></div>
+  <div class="tug" id="tug"></div>
+  <div class="dialog" id="dialog"></div>
+  <div class="duel-chart screen" id="duel-chart-wrap"><canvas id="duel-chart" aria-label="Duel progress chart"></canvas></div>
+  <p class="chart-note" id="duel-note" hidden></p>
 </section>
-<section class="profile" id="profile" hidden>
-  <h2>My profile</h2>
+<section class="panel profile" id="profile" hidden>
+  <h2 class="panel-title">Profile</h2>
   <form id="profile-form">
     <label>Name<input id="name" required minlength="2" maxlength="32" autocomplete="nickname"></label>
-    <label>Codeforces handle<input id="codeforces" maxlength="200" autocomplete="off" placeholder="Handle or profile URL"><a class="profile-link" id="codeforces-link" target="_blank" rel="noopener noreferrer" hidden>Open Codeforces profile</a></label>
-    <label>LeetCode username<input id="leetcode" maxlength="200" autocomplete="off" placeholder="Username or profile URL"><a class="profile-link" id="leetcode-link" target="_blank" rel="noopener noreferrer" hidden>Open LeetCode profile</a></label>
-    <button class="action" id="save-profile" type="submit">Save profile</button>
+    <label>Codeforces<input id="codeforces" maxlength="200" autocomplete="off" placeholder="handle or profile URL"><a class="profile-link" id="codeforces-link" target="_blank" rel="noopener noreferrer" hidden>Open profile ↗</a></label>
+    <label>LeetCode<input id="leetcode" maxlength="200" autocomplete="off" placeholder="username or profile URL"><a class="profile-link" id="leetcode-link" target="_blank" rel="noopener noreferrer" hidden>Open profile ↗</a></label>
+    <button class="btn" id="save-profile" type="submit">Save</button>
   </form>
   <p class="message" id="profile-message" aria-live="polite"></p>
 </section>
 <main class="layout">
-<section>
-<h2>Leaderboard</h2>
+<div class="col">
+<section class="panel">
+<h2 class="panel-title">Leaderboard</h2>
 <div class="board-bar">
   <div class="tabs" id="tabs"></div>
   <div class="filters">
-    <label>Platform
+    <label>Platform:
       <select id="platform">
         <option value="all">All</option>
         <option value="lc">LeetCode</option>
         <option value="cf">Codeforces</option>
       </select>
     </label>
-    <label>Sort by
+    <label>Sort:
       <select id="sort">
         <option value="points">Score</option>
-        <option value="solved">Questions solved</option>
+        <option value="solved">Solved</option>
         <option value="rating">Rating</option>
       </select>
     </label>
   </div>
 </div>
+<div class="chart-bar">
+  <div class="tabs chart-toggle" id="chart-view">
+    <button data-v="standings" class="on">Standings</button><button data-v="progress">Progress</button>
+  </div>
+</div>
+<div class="chart-wrap screen" id="chart-wrap"><canvas id="chart" aria-label="Leaderboard chart"></canvas></div>
+<p class="chart-note" id="chart-note" hidden></p>
 <table><thead><tr><th class="rank">#</th><th>Name</th><th class="n">Points</th><th class="n">Solved</th><th class="n" id="cf-head">CF</th><th class="n" id="lc-head">LC</th></tr></thead><tbody id="board"></tbody></table>
 </section>
-<section>
-<h2>Upcoming contests</h2>
-<table><tbody id="contests"></tbody></table>
+<section class="panel">
+<h2 class="panel-title">Ranks</h2>
+<div class="ranks">
+  <div class="rank-cards" id="ranks"></div>
+  <aside class="legend" id="legend" aria-label="Rank legend"></aside>
+</div>
 </section>
+</div>
+<div class="col">
+<section class="panel">
+<h2 class="panel-title">Contest calendar</h2>
+<div class="calendar screen" id="calendar"></div>
+<div class="cal-day" id="cal-day"></div>
+</section>
+<section class="panel">
+<h2 class="panel-title">Upcoming contests</h2>
+<table><thead><tr><th>Site</th><th>Contest</th><th>Starts</th><th class="n">Len</th></tr></thead><tbody id="contests"></tbody></table>
+</section>
+</div>
 </main>
+<footer class="statusbar">
+  <span>Scoring: CF rating/100 · LC 5/10/20</span>
+  <span>Keys: <kbd>w</kbd> <kbd>b</kbd> <kbd>m</kbd> <kbd>a</kbd> period · <kbd>s</kbd> <kbd>p</kbd> chart · <kbd>d</kbd> duel</span>
+  <span><a href="https://github.com/ChandanYdv0402/cp-leaderboard" target="_blank" rel="noopener noreferrer">Source ↗</a></span>
+</footer>
+<dialog class="signin" id="signin-dialog" aria-labelledby="signin-title">
+  <div class="dlg">
+    <div class="dlg-head"><h2 id="signin-title">Sign in</h2><button class="x" id="signin-close" aria-label="Close">×</button></div>
+    <p class="dlg-sub">Join the board. New emails get an account automatically.</p>
+    <div class="oauth">
+      <button class="btn btn-ghost" data-oauth="oauth_google">Google</button>
+      <button class="btn btn-ghost" data-oauth="oauth_github">GitHub</button>
+    </div>
+    <div class="or"><span>or</span></div>
+    <form id="email-form">
+      <label>Email<input id="si-email" type="email" required autocomplete="email" placeholder="you@example.com"></label>
+      <button class="btn" type="submit">Send code</button>
+    </form>
+    <form id="code-form" hidden>
+      <label>Code sent to <span id="si-sent"></span><input id="si-code" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" required></label>
+      <label id="si-pass-wrap" hidden>Password<input id="si-pass" type="password" autocomplete="new-password" minlength="8"></label>
+      <div class="dlg-row"><button class="btn" type="submit">Verify</button><button type="button" class="linkbtn" id="si-back">Use another email</button></div>
+    </form>
+    <p class="message" id="si-msg" aria-live="polite"></p>
+    <div id="clerk-captcha"></div>
+  </div>
+</dialog>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
@@ -102,6 +429,338 @@ const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 const $ = id => document.getElementById(id);
 const setMessage = (id, text) => { $(id).textContent = text; };
 const showError = (id, error) => setMessage(id, error?.message || "Something went wrong.");
+
+// ---------- 8-bit graphics ----------
+// Pixel art from character maps: each character is one pixel, looked up in `colors` (missing = transparent).
+function pixelArt(rows, colors, size, cls = "") {
+  const w = Math.max(...rows.map(r => r.length)), h = rows.length;
+  let rects = "";
+  rows.forEach((row, y) => [...row].forEach((ch, x) => {
+    if (colors[ch]) rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${colors[ch]}"/>`;
+  }));
+  return `<svg class="${cls}" viewBox="0 0 ${w} ${h}" width="${w * size}" height="${h * size}" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
+}
+const TROPHY = [
+  "  YYYYYYYYYY  ",
+  "YYYWYYYYYYYYYY",
+  "Y YWYYYYYYYY Y",
+  "Y YWYYYYYYYD Y",
+  " YYWYYYYYYDYY ",
+  "   YWYYYYDY   ",
+  "    YYYYDY    ",
+  "     YYYY     ",
+  "      DD      ",
+  "      DD      ",
+  "     OOOO     ",
+  "    OOOOOO    ",
+  "   BBBBBBBB   ",
+  "   BLLLLLLB   ",
+];
+const TROPHY_COLORS = { Y: "#d4b33a", W: "#fff1a8", D: "#a8862a", O: "#8a6d1f", B: "#3a3a3a", L: "#6b6b6b" };
+
+// ---------- RPG party sprites ----------
+// 24x32 characters stacked from layers (cape, body, head gear, weapon, fist, shield); each tier picks parts and colors.
+const SPRITE_W = 24, SPRITE_H = 32;
+const part = (y, ...rows) => ({ y, rows });
+const repeat = (row, n) => Array(n).fill(row);
+const BODY = part(6,
+  "         kkkkkk",
+  "        kffffffk",
+  "        kfssssfk",
+  "        ksessesk",
+  "        kssssssk",
+  "        kSssssSk",
+  "         kSSSSk",
+  "       kkkkSSkkkk",
+  "      kaaaaaaaaaak",
+  "     kaahaaaaaaAAak",
+  "     kahhaaaaaaaAak",
+  "     kahaaaaaaaaAak",
+  "     kahaaaaaaaaAak",
+  "     kakttttttttkak",
+  "     kakaaaaaaaakak",
+  "     kskaaaaaaaaksk",
+  "      kkaaaaaaaakk",
+  ...repeat("       kLLLkkLLLk", 4),
+  "       kbbbkkbbbk",
+  "      kbbbbkkbbbbk",
+  "      kkkkkkkkkkkk",
+  "",
+  "     oooooooooooooo");
+const FIST = part(20, "    kk", "   ksss", "    kk");
+const GEAR = {
+  plume: part(2, "             pp", "            ppP", "           ppP", "         kppPPk"),
+  helm: part(6,
+    "        kmmmmmmk",
+    "       kmwmmmmmMk",
+    "       kmwmmmmmMk",
+    "       kmkkkkkkMk",
+    "       kmmmkkmmMk",
+    "       kmmmmmmmMk",
+    "        kMMMMMMk"),
+  wings: part(5, "     w            w", "    ww            ww", "    www          www", "     ww          ww"),
+  hood: part(5,
+    "         kkkkkk",
+    "        kcccccck",
+    "       kcccccccck",
+    "       kcCssssCck",
+    ...repeat("       kcC    Cck", 3),
+    "        kcc  cck",
+    "       kccc  ccck"),
+  mask: part(11, "         CCCCCC"),
+  cap: part(5, "         kkkkkk", "        kbbbbbbk", "       kbbbbbbbbk", "       kkkkkkkkkk"),
+  wizardHat: part(0,
+    "              kk",
+    "            kkcck",
+    "           kcccck",
+    "          kccgcck",
+    "         kcccccCk",
+    "        kccccccCCk",
+    "      kkttttttttttkk",
+    "    kcccccccccccccccck",
+    "     kkkkkkkkkkkkkkkk"),
+  beard: part(10, "        kffssffk", "        kffffffk", "        kffffffk", "         kffffk", "          kffk", "           kk"),
+  hornHelm: part(3,
+    "     n            n",
+    "     nn          nn",
+    "      nn kkkkkk nn",
+    "       nkmmmmmmkn",
+    "       kmwmmmmmMk",
+    "       kmmmmmmmMk",
+    "       kmk    kMk",
+    "       kmm    mMk",
+    "       kmmmkkmmMk",
+    "        kMMMMMMk"),
+  crown: part(3, "        t  gg  t", "        tt tt tt", "        tgttttgt", "        kTTTTTTk"),
+  cape: part(13,
+    "      kcccccccccck",
+    "    kcccccccccccccck",
+    ...repeat("   kcccccccccccccccck", 8),
+    ...repeat("  kCcccccccccccccccccCk", 5),
+    "  kCCCCCCCCCCCCCCCCCCk",
+    "  kkkkkkkkkkkkkkkkkkkk"),
+  shield: part(15,
+    "                kkkkkk",
+    "               kmzzzzmk",
+    "               kzzggzzk",
+    "               kzggggzk",
+    "               kzzggzzk",
+    "               kzzggzzk",
+    "                kzzzzk",
+    "                 kzzk",
+    "                  kk"),
+  stick: part(14, "    b", ...repeat("    B", 14)),
+  bow: part(12, " B", " MB", " M B", " M B", ...repeat(" M  B", 11), " M B", " M B", " MB", " B"),
+  dagger: part(14, "    w", ...repeat("   wm", 4), "  tttt", "    B", "    B", "    B", "    t"),
+  sword: part(6, "    w", ...repeat("   wm", 11), "   wM", "  tttt", "    B", "    B", "    B", "    t"),
+  greatsword: part(1, "   w", ...repeat("  wmM", 16), "  wMM", " tgtgt", "    B", "    B", "    B", "    g", "    t"),
+  staff: part(0, "  w   w", "   kgk", "   gwg", "   kgk", ...repeat("    B", 26)),
+  hammer: part(5, " kkkkkkk", ...repeat(" kwmmmMk", 3), " kkkkkkk", ...repeat("    B", 18)),
+  axe: part(3, "    b", "  kkB", " kwmB", ...repeat("kwmmB", 5), " kwmB", "  kkB", ...repeat("    B", 16)),
+  doubleAxe: part(3, "    b", "  kkBkk", " kwmBmwk", ...repeat("kwmmBmwk", 5), " kwmBmwk", "  kkBkk", ...repeat("    B", 16)),
+};
+const BASE_COLORS = {
+  k: "#0b0b0b", s: "#f1c27d", S: "#c98e55", e: "#1b1b1b", f: "#6b4423", a: "#8d8d8d", A: "#5f5f5f", h: "#b8b8b8",
+  t: "#8b5a2b", T: "#a8862a", L: "#4a3a2a", b: "#6b4423", B: "#8b5a2b", m: "#c9ccd1", M: "#7c828c", w: "#ffffff",
+  c: "#555555", C: "#333333", z: "#6b8cff", g: "#ffd34d", n: "#e8dcc0", p: "#d33a3a", P: "#922222", o: "#000000",
+};
+// Layers are listed back to front; a weapon also gets the fist drawn over its grip.
+const HERO = (layers, colors) => ({ layers, colors });
+const SPRITES = {
+  // Codeforces
+  "Newbie": HERO(["stick"], {}),
+  "Pupil": HERO(["hood", "bow"], { a: "#6abf69", A: "#3f8f4a", h: "#9be09a", c: "#3f8f4a", C: "#2b6634", L: "#3b4a2a" }),
+  "Specialist": HERO(["hood", "mask", "dagger"], { a: "#4fc3c3", A: "#2a8a8a", h: "#8ae6e6", c: "#2f6f7a", C: "#1f4a52", L: "#22343a", t: "#1f4a52" }),
+  "Expert": HERO(["helm", "plume", "sword", "shield"], { a: "#6b8cff", A: "#4562c9", h: "#a8bbff", z: "#6b8cff", p: "#6b8cff", P: "#4562c9", L: "#5a5f6a", b: "#3a3f4a", t: "#c9ccd1" }),
+  "Candidate Master": HERO(["wizardHat", "beard", "staff"], { a: "#b36bff", A: "#7a3fc9", h: "#d3a8ff", c: "#7a3fc9", C: "#55288f", t: "#ffd34d", f: "#e6e6e6", L: "#7a3fc9", b: "#3a2a4a" }),
+  "Master": HERO(["helm", "plume", "hammer", "shield"], { a: "#ffb347", A: "#c97f1f", h: "#ffd699", z: "#ffb347", g: "#fff1a8", p: "#ffb347", P: "#c97f1f", t: "#ffd34d", L: "#5a4a3a" }),
+  "Intl. Master": HERO(["cape", "helm", "plume", "hammer", "shield"], { a: "#ff9f1a", A: "#c9700a", h: "#ffc870", z: "#ff9f1a", g: "#fff1a8", p: "#ffffff", P: "#c9c9c9", c: "#c94a1f", C: "#8f3214", t: "#ffd34d", L: "#5a4a3a" }),
+  "Grandmaster": HERO(["hornHelm", "axe"], { a: "#ff6b6b", A: "#c94040", h: "#ff9f9f", m: "#8a8f99", M: "#4f545c", e: "#ff3b3b", L: "#4a2a2a", t: "#2a2a2a" }),
+  "Intl. Grandmaster": HERO(["cape", "hornHelm", "doubleAxe"], { a: "#ff4040", A: "#b82020", h: "#ff8a8a", m: "#8a8f99", M: "#4f545c", e: "#ff3b3b", c: "#8f1414", C: "#5c0b0b", L: "#4a2a2a", t: "#2a2a2a" }),
+  "Legendary GM": HERO(["cape", "crown", "greatsword", "shield"], { a: "#ff1f1f", A: "#a80f0f", h: "#ff7a7a", f: "#2a2a2a", c: "#5c0b0b", C: "#3a0505", t: "#ffd34d", T: "#c99a1f", g: "#ff4d4d", z: "#1b1b1b", L: "#2a2a2a", b: "#1b1b1b" }),
+  // LeetCode
+  "Novice": HERO(["stick"], { f: "#3b2a1a" }),
+  "Squire": HERO(["cap", "sword"], { a: "#6abf69", A: "#3f8f4a", h: "#9be09a" }),
+  "Knight": HERO(["helm", "plume", "sword", "shield"], { a: "#5fa8d3", A: "#3d6f8f", h: "#9fd0ea", z: "#5fa8d3", p: "#e0a43a", P: "#a8762a", g: "#e0a43a", L: "#5a5f6a", b: "#3a3f4a", t: "#c9ccd1" }),
+  "Guardian": HERO(["cape", "helm", "wings", "plume", "sword", "shield"], { a: "#e0a43a", A: "#a8762a", h: "#ffd699", m: "#ffd34d", M: "#c99a1f", z: "#e0a43a", g: "#ffffff", c: "#3d6f8f", C: "#28485c", p: "#ffffff", P: "#c9c9c9", t: "#ffd34d", L: "#5a4a3a" }),
+};
+const WEAPONS = new Set(["stick", "bow", "dagger", "sword", "greatsword", "staff", "hammer", "axe", "doubleAxe"]);
+const spriteCache = new Map();
+function spriteRows(tierName) {
+  if (spriteCache.has(tierName)) return spriteCache.get(tierName);
+  const hero = SPRITES[tierName] || SPRITES.Newbie;
+  const grid = Array.from({ length: SPRITE_H }, () => Array(SPRITE_W).fill(" "));
+  const stamp = ({ y, rows }) => rows.forEach((row, dy) => [...row].forEach((ch, x) => { if (ch !== " ") grid[y + dy][x] = ch; }));
+  const back = hero.layers.filter(l => l === "cape"), front = hero.layers.filter(l => l !== "cape" && l !== "shield");
+  back.forEach(l => stamp(GEAR[l]));
+  stamp(BODY);
+  front.forEach(l => { stamp(GEAR[l]); if (WEAPONS.has(l)) stamp(FIST); });
+  if (hero.layers.includes("shield")) stamp(GEAR.shield);
+  const result = { rows: grid.map(r => r.join("")), colors: { ...BASE_COLORS, ...hero.colors } };
+  spriteCache.set(tierName, result);
+  return result;
+}
+const sprite = (tierName, size = 3, cls = "sprite") => { const s = spriteRows(tierName); return pixelArt(s.rows, s.colors, size, cls); };
+// Head-and-shoulders crop, used as the player's avatar.
+const portraitRows = tierName => { const s = spriteRows(tierName); return { rows: s.rows.slice(0, 16).map(r => r.slice(3, 21)), colors: s.colors }; };
+const portrait = (tierName, size = 1.25) => { const p = portraitRows(tierName); return pixelArt(p.rows, p.colors, size, "avatar"); };
+// Same crop on a canvas, for Chart.js point styles and axis labels.
+const portraitCanvasCache = new Map();
+function portraitCanvas(tierName, size = 1) {
+  const key = `${tierName}@${size}`;
+  if (portraitCanvasCache.has(key)) return portraitCanvasCache.get(key);
+  const { rows, colors } = portraitRows(tierName);
+  const canvas = document.createElement("canvas");
+  canvas.width = rows[0].length * size; canvas.height = rows.length * size;
+  const ctx = canvas.getContext("2d");
+  rows.forEach((row, y) => [...row].forEach((ch, x) => { if (colors[ch]) { ctx.fillStyle = colors[ch]; ctx.fillRect(x * size, y * size, size, size); } }));
+  portraitCanvasCache.set(key, canvas);
+  return canvas;
+}
+
+// Small mirrored 5x5 sprite from a hash of the name, so everyone gets a stable avatar.
+const AVATAR_COLORS = ["#5fa8d3", "#e0a43a", "#6abf69", "#d4b33a", "#c97b9b", "#9f8fe0", "#4fc3c3", "#e07a5f"];
+function avatar(name, size = 3) {
+  let h = 2166136261;
+  for (const c of String(name)) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+  const rows = [];
+  for (let y = 0; y < 5; y++) {
+    let half = "";
+    for (let x = 0; x < 3; x++) half += (h >>> (y * 3 + x)) & 1 ? "#" : ".";
+    rows.push(half + half[1] + half[0]);
+  }
+  if (!rows.join("").includes("#")) rows[2] = "..#..";
+  return pixelArt(rows, { "#": AVATAR_COLORS[(h >>> 16) % AVATAR_COLORS.length] }, size, "avatar");
+}
+
+// 8-bit spinner: eight pixels around a diamond, lit in turn.
+function spinner() {
+  const cells = [[2, 0], [3, 1], [4, 2], [3, 3], [2, 4], [1, 3], [0, 2], [1, 1]];
+  return `<svg class="spin" viewBox="0 0 5 5" shape-rendering="crispEdges" role="status" aria-label="Loading">` +
+    cells.map(([x, y], i) => `<rect x="${x}" y="${y}" width="1" height="1" fill="currentColor" style="animation-delay:${(i * 0.1).toFixed(1)}s"/>`).join("") + "</svg>";
+}
+const loadingRow = (cols, text = "loading") => `<tr><td colspan="${cols}"><div class="loading">${spinner()}${text}</div></td></tr>`;
+
+$("brand-icon").innerHTML = pixelArt(TROPHY, TROPHY_COLORS, 1.5);
+$("hero").innerHTML =
+  `<div class="side" title="Codeforces · Legendary GM">${sprite("Legendary GM", 4)}</div>` +
+  `<div class="hero-center"><div class="bob">${pixelArt(TROPHY, TROPHY_COLORS, 6)}</div>` +
+  `<h2>CP LEADERBOARD</h2><p>Codeforces × LeetCode · weekly · bi-weekly · monthly</p></div>` +
+  `<div class="side" title="LeetCode · Guardian">${sprite("Guardian", 4)}</div>`;
+
+// Next-sync progress: the fetcher runs on cron "0 */6 * * *" (UTC), i.e. every 6h from epoch.
+function updateSyncBar() {
+  const period = 6 * 3600e3, elapsed = Date.now() % period, left = period - elapsed;
+  $("sync-bar").style.setProperty("--p", (elapsed / period).toFixed(3));
+  $("sync-left").textContent = `~${Math.floor(left / 3600e3)}h ${String(Math.floor(left / 60e3) % 60).padStart(2, "0")}m`;
+}
+updateSyncBar();
+setInterval(updateSyncBar, 60e3);
+
+// ---------- Ranks: tiers, XP bars, legend ----------
+const CF_TIERS = [
+  [0, "Newbie", "#9e9e9e"], [1200, "Pupil", "#6abf69"], [1400, "Specialist", "#4fc3c3"], [1600, "Expert", "#6b8cff"],
+  [1900, "Candidate Master", "#b36bff"], [2100, "Master", "#ffb347"], [2300, "Intl. Master", "#ff9f1a"],
+  [2400, "Grandmaster", "#ff6b6b"], [2600, "Intl. Grandmaster", "#ff4040"], [3000, "Legendary GM", "#ff1f1f"],
+];
+// LeetCode only names Knight and Guardian (set by contest percentile), so these cut-offs are approximate.
+const LC_TIERS = [[0, "Novice", "#9e9e9e"], [1500, "Squire", "#6abf69"], [1850, "Knight", "#5fa8d3"], [2150, "Guardian", "#e0a43a"]];
+function tierOf(tiers, rating) {
+  if (rating == null) return null;
+  const i = tiers.findLastIndex(t => rating >= t[0]);
+  const [floor, name, color] = tiers[i], next = tiers[i + 1];
+  return { name, color, next: next?.[0], nextName: next?.[1], pct: next ? (rating - floor) / (next[0] - floor) : 1 };
+}
+// The tier a player is shown as: the given platform's, or for "all" whichever rating is higher.
+function playerTier(cf, lc, platform = "all") {
+  if (platform === "cf") return tierOf(CF_TIERS, cf);
+  if (platform === "lc") return tierOf(LC_TIERS, lc);
+  return (cf ?? -1) >= (lc ?? -1) ? tierOf(CF_TIERS, cf) : tierOf(LC_TIERS, lc);
+}
+// Avatar: the tier character's portrait, or the name identicon while unrated.
+const playerAvatar = (name, cf, lc, platform) => { const t = playerTier(cf, lc, platform); return t ? portrait(t.name) : avatar(name); };
+// One party slot: platform + tier, rating / next, XP bar, then the full character.
+function heroSlot(label, tiers, rating) {
+  const t = tierOf(tiers, rating);
+  if (!t) return `<div class="hero-slot unrated" style="--c:var(--faint)"><div class="slot-head"><span>${label} Unrated</span><span>–</span></div>` +
+    `<div class="xp"><i></i></div><div class="slot-art">${sprite(tiers[0][1])}</div></div>`;
+  const r = Math.round(rating);
+  const title = t.next ? `${t.next - r} rating to ${t.nextName}` : "Top tier";
+  return `<div class="hero-slot" style="--c:${t.color}" title="${esc(title)}">` +
+    `<div class="slot-head"><span>${label} <b>${t.name}</b></span><span>${t.next ? `${r}/${t.next}` : `${r} max`}</span></div>` +
+    `<div class="xp"><i style="--p:${Math.min(1, Math.max(0, t.pct)).toFixed(3)}"></i></div>` +
+    `<div class="slot-art">${sprite(t.name)}</div></div>`;
+}
+function renderRanks() {
+  const best = r => Math.max(r.cf_rating ?? 0, r.lc_rating ?? 0);
+  $("ranks").innerHTML = [...boardRows].sort((a, b) => best(b) - best(a)).map(r =>
+    `<div class="rank-card screen"><h3>${playerAvatar(r.name, r.cf_rating, r.lc_rating)}${esc(r.name)}</h3>` +
+    `<div class="party">${heroSlot("CF", CF_TIERS, r.cf_rating)}${heroSlot("LC", LC_TIERS, r.lc_rating)}</div></div>`
+  ).join("") || `<div class="loading">no players yet</div>`;
+}
+function renderLegend() {
+  const list = tiers => tiers.map((t, i) =>
+    `<li>${sprite(t[1], 1, "sprite-sm")}<span style="color:${t[2]}">${t[1]}</span><span>${t[0]}${tiers[i + 1] ? `–${tiers[i + 1][0] - 1}` : "+"}</span></li>`).join("");
+  $("legend").innerHTML = `<h4>Codeforces</h4><ul>${list(CF_TIERS)}</ul><h4>LeetCode</h4><ul>${list(LC_TIERS)}</ul>` +
+    `<p>The XP bar fills from your tier's floor to the next tier. LeetCode tiers are approximate.</p>`;
+}
+renderLegend();
+$("ranks").innerHTML = `<div class="loading">${spinner()}loading</div>`;
+
+// ---------- Contest calendar ----------
+let contestsData = [];
+let calMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let calSelected = null;
+const dayKey = d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+const contestTag = c => c.platform === "codeforces" ? `<span class="tag cf">CF</span>` : `<span class="tag lc">LC</span>`;
+function renderCalendar() {
+  const byDay = new Map();
+  for (const c of contestsData) {
+    const key = dayKey(new Date(c.start));
+    if (!byDay.has(key)) byDay.set(key, []);
+    byDay.get(key).push(c);
+  }
+  const first = calMonth, start = new Date(first);
+  start.setDate(1 - first.getDay());
+  const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  const cellCount = Math.ceil((first.getDay() + daysInMonth) / 7) * 7;
+  const today = dayKey(new Date());
+  let cells = "";
+  for (let i = 0; i < cellCount; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const key = dayKey(d), list = byDay.get(key) || [];
+    const kinds = [...new Set(list.map(c => c.platform === "codeforces" ? "cf" : "lc"))];
+    const cls = ["cal-cell", d.getMonth() !== first.getMonth() && "out", key === today && "today", list.length && "has", key === calSelected && "sel"].filter(Boolean).join(" ");
+    const title = list.map(c => `${c.platform === "codeforces" ? "CF" : "LC"} · ${c.name}`).join("\n");
+    cells += `<button type="button" class="${cls}" data-k="${key}" ${list.length ? `title="${esc(title)}"` : 'tabindex="-1"'}>` +
+      `<span>${d.getDate()}</span><span class="marks">${kinds.map(k => `<b class="${k}"></b>`).join("")}</span></button>`;
+  }
+  $("calendar").innerHTML =
+    `<div class="cal-head"><button type="button" class="cal-nav" data-d="-1" aria-label="Previous month">‹</button>` +
+    `<span>${first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</span>` +
+    `<button type="button" class="cal-nav" data-d="1" aria-label="Next month">›</button></div>` +
+    `<div class="cal-grid">${["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(d => `<span class="dow">${d}</span>`).join("")}${cells}</div>` +
+    `<div class="cal-legend"><span><b style="background:var(--cf)"></b>Codeforces</span><span><b style="background:var(--lc)"></b>LeetCode</span></div>`;
+  const list = calSelected && byDay.get(calSelected);
+  $("cal-day").innerHTML = list?.length
+    ? `<h4>${new Date(list[0].start).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</h4><ul>` +
+      list.map(c => `<li>${contestTag(c)}<time>${new Date(c.start).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</time>` +
+        `<a href="${esc(/^https:\/\//i.test(c.url) ? c.url : "#")}" target="_blank" rel="noopener noreferrer">${esc(c.name)}</a></li>`).join("") + "</ul>"
+    : "";
+}
+$("calendar").addEventListener("click", event => {
+  const nav = event.target.closest(".cal-nav");
+  if (nav) {
+    calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + Number(nav.dataset.d), 1);
+    return renderCalendar();
+  }
+  const cell = event.target.closest(".cal-cell.has");
+  if (cell) {
+    calSelected = calSelected === cell.dataset.k ? null : cell.dataset.k;
+    renderCalendar();
+  }
+});
+$("calendar").innerHTML = `<div class="loading">${spinner()}loading</div>`;
 const HANDLE_PATTERN = /^[A-Za-z0-9_.-]{1,40}$/;
 function handleFromProfileInput(platform, value) {
   const raw = String(value ?? "").trim();
@@ -160,8 +819,9 @@ async function loadClerk() {
   await instance.load({
     appearance: {
       variables: {
-        colorBackground: "#161922", colorText: "#e8e8e8", colorTextSecondary: "#999",
-        colorInputBackground: "#0f1115", colorInputText: "#e8e8e8", colorPrimary: "#60a5fa", colorNeutral: "#e8e8e8"
+        colorBackground: "#121212", colorText: "#f5f5f5", colorTextSecondary: "#a3a3a3",
+        colorInputBackground: "#070707", colorInputText: "#f5f5f5", colorPrimary: "#e4e4e4", colorNeutral: "#f5f5f5",
+        colorTextOnPrimaryBackground: "#121212", borderRadius: "0px"
       }
     }
   });
@@ -179,12 +839,12 @@ let profileLoadedFor = null;
 async function showLeaderboard(period = currentPeriod) {
   currentPeriod = period;
   [...$("tabs").children].forEach(button => button.classList.toggle("on", button.dataset.k === period));
-  $("board").innerHTML = "<tr><td colspan=\"6\">Loading...</td></tr>";
+  $("board").innerHTML = loadingRow(6);
   const days = { week: 7, biweek: 14, month: 30, all: null }[period];
   const { data, error } = await supabase.rpc("leaderboard", { days });
   if (period !== currentPeriod) return; // a newer tab click won
   if (error) {
-    $("board").innerHTML = "<tr><td colspan=\"6\">Leaderboard is unavailable.</td></tr>";
+    $("board").innerHTML = "<tr><td colspan=\"6\" class=\"empty\">leaderboard unavailable</td></tr>";
     return showError("updated", error);
   }
   boardRows = data;
@@ -201,6 +861,7 @@ function renderBoard() {
     const pick = (cf, lc, all) => platform === "cf" ? cf : platform === "lc" ? lc : all;
     return {
       name: row.name,
+      raw: row,
       cf_rating: row.cf_rating,
       lc_rating: row.lc_rating,
       // Per-platform fields come from the updated leaderboard() SQL; "–" until it is installed.
@@ -213,26 +874,410 @@ function renderBoard() {
   rows.sort((a, b) => key(b) - key(a) || (b.points ?? 0) - (a.points ?? 0));
   const cols = 4 + (platform === "all" ? 2 : 1);
   $("board").innerHTML = rows.map((row, index) =>
-    `<tr><td>${index + 1}</td><td>${esc(row.name)}</td><td class="n">${esc(row.points)}</td><td class="n">${esc(row.solved)}</td>` +
+    `<tr class="${["first", "second", "third"][index] ?? ""}"><td class="rank">${String(index + 1).padStart(2, "0")}</td><td class="name">${playerAvatar(row.name, row.cf_rating, row.lc_rating, platform)}${esc(row.name)}</td><td class="n">${esc(row.points)}</td><td class="n">${esc(row.solved)}</td>` +
     (platform !== "lc" ? `<td class="n">${esc(row.cf_rating)}</td>` : "") +
     (platform !== "cf" ? `<td class="n">${esc(row.lc_rating)}</td>` : "") + "</tr>").join("") ||
-    `<tr><td colspan="${cols}">No leaderboard entries yet.</td></tr>`;
+    `<tr><td colspan="${cols}" class="empty">no entries yet</td></tr>`;
+  $("user-count").textContent = `${boardRows.length} user${boardRows.length === 1 ? "" : "s"}`;
+  renderChart(rows, platform, sort);
+  renderRanks();
+  renderArena();
+  renderAlert();
 }
+
+// Horizontal bars of the same rows as the table: CF/LC stacked for score and solved, side by side for rating.
+// Chart colors and font come from the CSS tokens in :root.
+const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const CHART_COLORS = { cf: cssVar("--cf"), lc: cssVar("--lc"), all: cssVar("--all") };
+function chartTheme() {
+  // Pixel font axes, square marks and a flat bordered tooltip, like the 8-bit Chart component.
+  window.Chart.defaults.font.family = cssVar("--pixel");
+  window.Chart.defaults.font.size = 7;
+  Object.assign(window.Chart.defaults.plugins.tooltip, {
+    backgroundColor: "#121212", borderColor: cssVar("--ring"), borderWidth: 2, cornerRadius: 0, padding: 10,
+    boxPadding: 4, usePointStyle: true, titleFont: { size: 8 }, bodyFont: { size: 8 }, footerFont: { size: 8 },
+  });
+  return { grid: { color: "#1f1f1f" }, ticks: { color: cssVar("--muted") }, border: { color: cssVar("--line"), dash: [2, 4] } };
+}
+// Bars drawn like XP bars: 2px gaps every 8px, a lit top edge and a shaded bottom edge.
+const pixelBars = {
+  id: "pixelBars",
+  afterDatasetsDraw(chart) {
+    const { ctx } = chart, bg = cssVar("--bg");
+    ctx.save();
+    chart.data.datasets.forEach((_, i) => {
+      const meta = chart.getDatasetMeta(i);
+      if (meta.hidden) return;
+      for (const bar of meta.data) {
+        const { x, y, base, height } = bar.getProps(["x", "y", "base", "height"], true);
+        const left = Math.min(x, base), width = Math.abs(x - base), top = y - height / 2;
+        if (width < 1) continue;
+        ctx.fillStyle = "rgba(255,255,255,.3)"; ctx.fillRect(left, top, width, 2);
+        ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(left, top + height - 2, width, 2);
+        ctx.fillStyle = bg;
+        for (let gx = left + 6; gx < left + width - 1; gx += 8) ctx.fillRect(gx, top, 2, height);
+      }
+    });
+    ctx.restore();
+  },
+};
+// Tier portraits beside the y-axis names (the ticks leave a gap for them via padding).
+const portraitLabels = images => ({
+  id: "portraitLabels",
+  afterDraw(chart) {
+    const y = chart.scales.y;
+    images.forEach((img, i) => img && chart.ctx.drawImage(img, y.right - img.width - 6, Math.round(y.getPixelForValue(i) - img.height / 2)));
+  },
+});
+let chart = null;
+let chartView = "standings";
+let chartToken = 0;
+function renderChart(rows, platform, sort) {
+  chart?.destroy();
+  chart = null;
+  chartToken++;
+  $("chart-note").hidden = true;
+  if (chartView === "progress") return renderProgress(platform, sort, chartToken);
+  $("chart-wrap").hidden = !rows.length || !window.Chart;
+  if ($("chart-wrap").hidden) return;
+  const [cfKey, lcKey] = { points: ["cf_points", "lc_points"], solved: ["cf_solved", "lc_solved"], rating: ["cf_rating", "lc_rating"] }[sort];
+  // Older leaderboard() without per-platform columns: fall back to one combined series.
+  const split = sort === "rating" || rows[0].raw[cfKey] !== undefined;
+  const series = (label, key, color) => ({ label, data: rows.map(r => r.raw[key] ?? 0), backgroundColor: color, borderRadius: 0, barPercentage: 0.7, categoryPercentage: 0.85 });
+  const tierColors = rows.map(r => playerTier(r.cf_rating, r.lc_rating, platform)?.color ?? CHART_COLORS.all);
+  const datasets = !split ? [series("All", sort, tierColors)] : [
+    ...(platform !== "lc" ? [series("Codeforces", cfKey, CHART_COLORS.cf)] : []),
+    ...(platform !== "cf" ? [series("LeetCode", lcKey, CHART_COLORS.lc)] : []),
+  ];
+  const stacked = sort !== "rating";
+  const barRows = stacked ? 1 : datasets.length;
+  $("chart-wrap").style.height = `${Math.max(160, rows.length * 46 * barRows + 100)}px`;
+  const axis = chartTheme();
+  const portraits = rows.map(r => { const t = playerTier(r.cf_rating, r.lc_rating, platform); return t && portraitCanvas(t.name, 2); });
+  chart = new window.Chart($("chart"), {
+    type: "bar",
+    data: { labels: rows.map(r => r.name), datasets },
+    plugins: [pixelBars, portraitLabels(portraits)],
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400, easing: "linear" },
+      interaction: { mode: "index", axis: "y", intersect: false },
+      scales: {
+        x: { ...axis, stacked, beginAtZero: true },
+        y: { ...axis, stacked, grid: { display: false }, ticks: { color: cssVar("--fg"), padding: 46 } },
+      },
+      plugins: {
+        legend: { display: datasets.length > 1, labels: { color: cssVar("--muted"), usePointStyle: true, pointStyle: "rect", boxWidth: 8, boxHeight: 8 } },
+        tooltip: { callbacks: { footer: items => stacked && items.length > 1 ? `Total: ${items.reduce((n, i) => n + i.parsed.x, 0)}` : "" } },
+      },
+    },
+  });
+}
+// ---- Progress view: one line per person over the selected period, from saved snapshots ----
+const LINE_COLORS = ["#60a5fa", "#f5a524", "#34d399", "#f472b6", "#a78bfa", "#f87171", "#22d3ee", "#facc15"];
+const progressCache = {};
+async function loadProgress(period) {
+  if (progressCache[period]) return progressCache[period];
+  const days = { week: 7, biweek: 14, month: 30, all: null }[period];
+  const { data: profiles, error: profileError } = await supabase.from("profiles").select("id,name");
+  if (profileError) throw profileError;
+  const snaps = [];
+  for (let from = 0; ; from += 1000) { // PostgREST caps responses at 1000 rows
+    let query = supabase.from("snapshots").select("user_id,taken_at,points,solved,cf_rating,lc_rating,stats")
+      .order("taken_at").range(from, from + 999);
+    if (days) query = query.gte("taken_at", new Date(Date.now() - days * 864e5).toISOString());
+    const { data, error } = await query;
+    if (error) throw error;
+    snaps.push(...data);
+    if (data.length < 1000) break;
+  }
+  return (progressCache[period] = { names: new Map(profiles.map(p => [p.id, p.name])), snaps });
+}
+function snapshotValue(snap, platform, sort) {
+  const st = snap.stats || {};
+  const lcSolved = (st.lc_easy ?? 0) + (st.lc_medium ?? 0) + (st.lc_hard ?? 0);
+  const lcPoints = 5 * (st.lc_easy ?? 0) + 10 * (st.lc_medium ?? 0) + 20 * (st.lc_hard ?? 0);
+  if (sort === "rating") {
+    if (platform !== "all") return platform === "cf" ? snap.cf_rating : snap.lc_rating;
+    const best = Math.max(snap.cf_rating ?? -Infinity, snap.lc_rating ?? -Infinity);
+    return Number.isFinite(best) ? best : null;
+  }
+  if (sort === "solved") return platform === "cf" ? st.cf_solved ?? 0 : platform === "lc" ? lcSolved : snap.solved;
+  return platform === "cf" ? st.cf_points ?? 0 : platform === "lc" ? lcPoints : snap.points;
+}
+async function renderProgress(platform, sort, token) {
+  let data;
+  try {
+    if (!progressCache[currentPeriod]) {
+      $("chart-note").innerHTML = `${spinner()} loading history`;
+      $("chart-note").hidden = false;
+    }
+    data = await loadProgress(currentPeriod);
+  } catch (error) {
+    $("chart-wrap").hidden = true;
+    showError("chart-note", error);
+    $("chart-note").hidden = false;
+    return;
+  }
+  if (token !== chartToken) return; // a newer render started meanwhile
+  const byUser = new Map();
+  for (const snap of data.snaps) {
+    const value = snapshotValue(snap, platform, sort);
+    if (value == null) continue;
+    if (!byUser.has(snap.user_id)) byUser.set(snap.user_id, []);
+    byUser.get(snap.user_id).push({ x: new Date(snap.taken_at).getTime(), y: value });
+  }
+  // Score/solved show gains since the first snapshot in the window; rating shows the actual rating.
+  // Stepped lines (a value holds until the next snapshot) with the player's tier portrait on the latest point.
+  const datasets = [...byUser].map(([userId, points], i) => {
+    const base = sort === "rating" ? 0 : points[0].y;
+    const color = LINE_COLORS[i % LINE_COLORS.length];
+    const name = data.names.get(userId) || "Unknown";
+    const row = boardRows.find(r => r.name === name);
+    const tier = row && playerTier(row.cf_rating, row.lc_rating, platform);
+    const last = points.length - 1;
+    return { label: name, data: points.map(p => ({ x: p.x, y: p.y - base })),
+      borderColor: color, backgroundColor: color + "12", pointBackgroundColor: color, pointBorderColor: color,
+      fill: "origin", stepped: "before", borderWidth: 3,
+      pointStyle: points.map((_, j) => j === last && tier ? portraitCanvas(tier.name, 2) : "rect"),
+      pointRadius: points.map((_, j) => j === last ? 13 : 3), pointHoverRadius: points.map((_, j) => j === last ? 14 : 5) };
+  });
+  $("chart-wrap").hidden = !datasets.length || !window.Chart;
+  const days = new Set(data.snaps.map(snap => snap.taken_at.slice(0, 10))).size;
+  $("chart-note").textContent = !datasets.length ? "No snapshots in this period yet."
+    : days < 3 ? `Only ${days} day${days === 1 ? "" : "s"} of history so far; lines fill in as snapshots are saved every 6 hours.` : "";
+  $("chart-note").hidden = !$("chart-note").textContent;
+  if ($("chart-wrap").hidden) return;
+  $("chart-wrap").style.height = "280px";
+  const axis = chartTheme();
+  const label = { points: "Points gained", solved: "Problems solved", rating: "Rating" }[sort];
+  chart = new window.Chart($("chart"), {
+    type: "line",
+    data: { datasets },
+    options: {
+      layout: { padding: { top: 18, right: 22 } },
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      interaction: { mode: "nearest", intersect: false },
+      scales: {
+        x: { ...axis, type: "linear", ticks: { ...axis.ticks, maxTicksLimit: 8,
+          // Under two days of data: show times, otherwise dates.
+          callback(v) {
+            return this.max - this.min < 2 * 864e5
+              ? new Date(v).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+              : new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+          } } },
+        y: { ...axis, beginAtZero: sort !== "rating", title: { display: true, text: label, color: cssVar("--faint") } },
+      },
+      plugins: {
+        legend: { labels: { color: cssVar("--muted"), usePointStyle: true, pointStyle: "rect", boxWidth: 8, boxHeight: 8 } },
+        tooltip: { callbacks: { title: items => new Date(items[0].parsed.x).toLocaleString() } },
+      },
+    },
+  });
+}
+for (const button of $("chart-view").children) {
+  button.onclick = () => {
+    chartView = button.dataset.v;
+    [...$("chart-view").children].forEach(b => b.classList.toggle("on", b === button));
+    renderBoard();
+  };
+}
+// Keys: w/b/m/a switch period, s/p switch chart view. Ignored while typing or with modifiers.
+document.addEventListener("keydown", event => {
+  if (event.metaKey || event.ctrlKey || event.altKey || /^(INPUT|SELECT|TEXTAREA)$/.test(event.target.tagName)) return;
+  const period = { w: "week", b: "biweek", m: "month", a: "all" }[event.key];
+  const view = { s: "standings", p: "progress" }[event.key];
+  if (period) [...$("tabs").children].find(b => b.dataset.k === period)?.click();
+  if (view) [...$("chart-view").children].find(b => b.dataset.v === view)?.click();
+  if (event.key === "d" && !$("arena").hidden) $("arena").scrollIntoView({ behavior: "smooth" });
+});
 $("platform").addEventListener("change", renderBoard);
 $("sort").addEventListener("change", renderBoard);
 
+// ---------- Duel arena + head-on alert ----------
+const DUEL_COLORS = ["#60a5fa", "#ff6b6b"];
+const PERIOD_NAMES = { week: "Weekly", biweek: "Bi-weekly", month: "Monthly", all: "All-time" };
+let duelPick = null; // [left name, right name]
+let duelChart = null, duelToken = 0;
+const ptsOf = r => r.points ?? 0;
+const STAR = pixelArt(["  y  ", " yyy ", "yyyyy", " yyy ", " y y "], { y: "#d4b33a" }, 2);
+// Closest pair on period points (within max(3, 10%)) or either rating (within 30). Null when nobody is that close.
+function headOn(rows) {
+  let best = null;
+  for (let i = 0; i < rows.length; i++) for (let j = i + 1; j < rows.length; j++) {
+    const a = rows[i], b = rows[j];
+    for (const [metric, x, y, limit] of [
+      ["pts", a.points, b.points, Math.max(3, 0.1 * Math.max(ptsOf(a), ptsOf(b)))],
+      ["CF rating", a.cf_rating, b.cf_rating, 30],
+      ["LC rating", a.lc_rating, b.lc_rating, 30],
+    ]) {
+      if (x == null || y == null || (!x && !y)) continue;
+      const score = Math.abs(x - y) / limit;
+      if (score <= 1 && (!best || score < best.score)) best = { a, b, metric, gap: Math.round(Math.abs(x - y)), score };
+    }
+  }
+  return best;
+}
+function renderAlert() {
+  const h = headOn(boardRows);
+  $("alert").hidden = !h;
+  if (!h) return;
+  $("alert").innerHTML = `<span class="bang">!</span><strong>HEAD-ON!</strong>` +
+    `<span><b>${esc(h.a.name)}</b> vs <b>${esc(h.b.name)}</b> · ${h.gap ? `${h.gap} ${h.metric} apart` : `tied on ${h.metric}`} · ${PERIOD_NAMES[currentPeriod]}</span>` +
+    `<button class="btn" id="alert-watch">Watch duel &gt;</button>`;
+  $("alert-watch").onclick = () => { duelPick = [h.a.name, h.b.name]; renderArena(); $("arena").scrollIntoView({ behavior: "smooth" }); };
+}
+function fighterCard(r, side, hpShare, color) {
+  const cf = r.cf_rating, lc = r.lc_rating;
+  const rating = (cf ?? -1) >= (lc ?? -1) ? cf : lc;
+  const t = playerTier(cf, lc);
+  const lv = Math.max(1, Math.floor((rating ?? 0) / 100));
+  const xp = !t ? `<div class="xp gold"><span class="lbl">unrated</span></div>`
+    : t.next ? `<div class="xp gold"><i style="--p:${Math.min(1, Math.max(0, t.pct)).toFixed(3)}"></i><span class="lbl">${Math.round(rating)}/${t.next}</span></div>`
+    : `<div class="xp gold"><i style="--p:1"></i><span class="lbl">DING</span></div>`;
+  return `<div class="fighter ${side}${t ? "" : " unrated"}" style="--c:${color}">` +
+    `<div class="f-name">${side === "right" ? `<small>Lv.${lv}</small>` : ""}${esc(r.name)}${side === "left" ? `<small>Lv.${lv}</small>` : ""}</div>` +
+    `<div class="f-tier" style="color:${t?.color ?? "var(--faint)"}">${t ? `${(cf ?? -1) >= (lc ?? -1) ? "CF" : "LC"} ${t.name}` : "Unrated"}</div>` +
+    `<div class="bar-row"><span>HP</span><span>${ptsOf(r)} pts</span></div>` +
+    `<div class="xp hp"><i style="--p:${hpShare.toFixed(3)}"></i><span class="lbl">${Math.round(hpShare * 100)}%</span></div>` +
+    `<div class="bar-row"><span>XP</span><span>${t?.nextName ? `next: ${t.nextName}` : t ? "max tier" : "–"}</span></div>${xp}` +
+    `<div class="f-art"><div class="flip">${sprite(t ? t.name : "Newbie", 5)}</div></div></div>`;
+}
+function taunts(a, b, wins, h) {
+  if (h) return [[a, `${h.gap ? `${h.gap} ${h.metric}` : "Nothing"} between us. Blink and I pass you.`], [b, "Then don't blink. This round is mine."]];
+  if (wins[0] === wins[1]) return [[a, "Dead even? Rematch next week."], [b, "Tie goes to whoever solves the next Hard."]];
+  const [lead, trail] = wins[0] > wins[1] ? [a, b] : [b, a];
+  const gap = Math.abs(ptsOf(a) - ptsOf(b));
+  const trailTier = playerTier(trail.cf_rating, trail.lc_rating)?.name ?? "peasant";
+  return [
+    [lead, gap ? `${gap} points ahead. Kneel, ${trailTier}!` : `More rounds won. Kneel, ${trailTier}!`],
+    [trail, ptsOf(trail) === 0 ? "*sharpens sword quietly* The week isn't over." : "Enjoy the lead. Next contest, you fall."],
+  ];
+}
+function renderArena() {
+  const rows = boardRows;
+  $("arena").hidden = rows.length < 2;
+  if (rows.length < 2) return;
+  const names = rows.map(r => r.name);
+  if (!duelPick || duelPick[0] === duelPick[1] || !duelPick.every(n => names.includes(n))) {
+    const h = headOn(rows);
+    duelPick = h ? [h.a.name, h.b.name] : [...rows].sort((x, y) => ptsOf(y) - ptsOf(x)).slice(0, 2).map(r => r.name);
+  }
+  ["duel-a", "duel-b"].forEach((id, k) => {
+    $(id).innerHTML = names.map(n => `<option${n === duelPick[k] ? " selected" : ""}>${esc(n)}</option>`).join("");
+  });
+  const [a, b] = duelPick.map(n => rows.find(r => r.name === n));
+  const total = ptsOf(a) + ptsOf(b);
+  const shareA = total ? ptsOf(a) / total : 0.5;
+  // Rounds: one per stat both players have; higher value takes it.
+  const wins = [0, 0];
+  const stats = [["Points", "points"], ["Solved", "solved"], ["CF rating", "cf_rating"], ["LC rating", "lc_rating"]].map(([label, key]) => {
+    const x = a[key], y = b[key];
+    if (x == null && y == null) return `<div class="tug-row"><span class="v">–</span><div class="tug-bar l"></div><span class="lab">${label}</span><div class="tug-bar r"></div><span class="v">–</span></div>`;
+    const vx = x ?? 0, vy = y ?? 0, sum = vx + vy;
+    if (vx !== vy) wins[vx > vy ? 0 : 1]++;
+    const px = sum ? vx / sum : 0.5;
+    return `<div class="tug-row"><span class="v${vx > vy ? " won" : ""}">${vx > vy ? STAR : ""}${esc(x ?? "–")}</span>` +
+      `<div class="tug-bar l" style="--c:${DUEL_COLORS[0]}"><i style="--p:${px.toFixed(3)}"></i></div><span class="lab">${label}</span>` +
+      `<div class="tug-bar r" style="--c:${DUEL_COLORS[1]}"><i style="--p:${(1 - px).toFixed(3)}"></i></div>` +
+      `<span class="v${vy > vx ? " won" : ""}">${esc(y ?? "–")}${vy > vx ? STAR : ""}</span></div>`;
+  });
+  const h = headOn([a, b]);
+  const [hi, lo] = [Math.max(...wins), Math.min(...wins)];
+  const leader = wins[0] > wins[1] ? a : b;
+  const verdict = h ? `<div class="verdict hot">HEAD-ON!<br>${h.gap ? `${h.gap} ${h.metric} apart` : `tied on ${h.metric}`}</div>`
+    : wins[0] === wins[1] ? `<div class="verdict">DEAD HEAT<br>${hi}–${lo}</div>`
+    : `<div class="verdict win">${lo === 0 && hi >= 3 ? "FLAWLESS VICTORY" : `${esc(leader.name)} leads`}<br>${hi}–${lo}</div>`;
+  const sparks = Array.from({ length: 14 }, (_, i) =>
+    `<i class="spark" style="left:${(i * 37 + 7) % 100}%;top:${(i * 53 + 5) % 62}%;animation-delay:${(i % 5) * 0.25}s"></i>`).join("");
+  $("arena-round").textContent = `${PERIOD_NAMES[currentPeriod]} round`;
+  $("ring").innerHTML = sparks + fighterCard(a, "left", shareA, DUEL_COLORS[0]) +
+    `<div class="vs"><div class="vs-text">VS</div>${verdict}</div>` + fighterCard(b, "right", 1 - shareA, DUEL_COLORS[1]) + `<div class="floor"></div>`;
+  $("tug").innerHTML = `<div class="tug-head"><span style="color:${DUEL_COLORS[0]}">${esc(a.name)}</span><b>ROUNDS ${wins[0]} : ${wins[1]}</b><span style="color:${DUEL_COLORS[1]}">${esc(b.name)}</span></div>` + stats.join("");
+  $("dialog").innerHTML = taunts(a, b, wins, h).map(([who, line]) => {
+    const t = playerTier(who.cf_rating, who.lc_rating);
+    const color = DUEL_COLORS[who === a ? 0 : 1];
+    return `<div class="say${who === a ? "" : " r"}" style="--c:${color}"><div class="pic">${t ? portrait(t.name, 3) : avatar(who.name, 9)}</div>` +
+      `<div class="bubble"><b>${esc(who.name)}</b>${esc(line)}</div></div>`;
+  }).join("");
+  renderDuelChart(a, b, ++duelToken);
+}
+// Points gained over the period for just the two fighters, in their duel colors.
+async function renderDuelChart(a, b, token) {
+  duelChart?.destroy();
+  duelChart = null;
+  let data;
+  try { data = await loadProgress(currentPeriod); } catch (error) { $("duel-chart-wrap").hidden = true; return showError("duel-note", error); }
+  if (token !== duelToken) return;
+  const series = [a, b].map((r, k) => {
+    const points = data.snaps.filter(snap => data.names.get(snap.user_id) === r.name)
+      .map(snap => ({ x: new Date(snap.taken_at).getTime(), y: snapshotValue(snap, "all", "points") })).filter(p => p.y != null);
+    const base = points[0]?.y ?? 0, color = DUEL_COLORS[k];
+    return { label: r.name, data: points.map(p => ({ x: p.x, y: p.y - base })), borderColor: color, backgroundColor: color + "14",
+      pointBackgroundColor: color, pointBorderColor: color, fill: "origin", stepped: "before", borderWidth: 3, pointStyle: "rect", pointRadius: 3 };
+  });
+  const empty = series.every(d => !d.data.length);
+  $("duel-chart-wrap").hidden = empty || !window.Chart;
+  $("duel-note").textContent = empty ? "No snapshots for these two in this period yet." : "";
+  $("duel-note").hidden = !empty;
+  if ($("duel-chart-wrap").hidden) return;
+  const axis = chartTheme();
+  duelChart = new window.Chart($("duel-chart"), {
+    type: "line",
+    data: { datasets: series },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+      layout: { padding: { top: 6, right: 10 } },
+      interaction: { mode: "nearest", intersect: false },
+      scales: {
+        x: { ...axis, type: "linear", ticks: { ...axis.ticks, maxTicksLimit: 6,
+          callback(v) { return this.max - this.min < 2 * 864e5 ? new Date(v).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" }); } } },
+        y: { ...axis, beginAtZero: true, title: { display: true, text: "Points gained", color: cssVar("--faint") } },
+      },
+      plugins: {
+        legend: { labels: { color: cssVar("--muted"), usePointStyle: true, pointStyle: "rect", boxWidth: 8, boxHeight: 8 } },
+        tooltip: { callbacks: { title: items => new Date(items[0].parsed.x).toLocaleString() } },
+      },
+    },
+  });
+}
+$("duel-a").onchange = $("duel-b").onchange = event => {
+  const k = event.target.id === "duel-a" ? 0 : 1, previous = duelPick[k];
+  duelPick[k] = event.target.value;
+  // Picking the other side's fighter swaps the two rather than mirroring one player.
+  if (duelPick[1 - k] === duelPick[k]) duelPick[1 - k] = previous;
+  renderArena();
+};
+$("duel-swap").onclick = () => { duelPick.reverse(); renderArena(); };
+$("duel-shuffle").onclick = () => {
+  const names = boardRows.map(r => r.name).sort(() => Math.random() - 0.5);
+  duelPick = names.slice(0, 2);
+  renderArena();
+};
+
 async function loadContests() {
+  $("contests").innerHTML = loadingRow(4);
   const { data, error } = await supabase.from("contests").select("platform,name,start,duration,url")
     .gte("start", new Date().toISOString()).order("start");
   if (error) {
-    $("contests").innerHTML = "<tr><td>Contests are unavailable.</td></tr>";
+    $("contests").innerHTML = "<tr><td colspan=\"4\" class=\"empty\">contests unavailable</td></tr>";
+    $("calendar").innerHTML = `<div class="loading">calendar unavailable</div>`;
     return;
   }
+  contestsData = data;
+  if (!calSelected && data.length) calSelected = dayKey(new Date(data[0].start)); // preselect the next contest day
+  renderCalendar();
   $("contests").innerHTML = data.map(contest => {
     const url = /^https:\/\//i.test(contest.url) ? contest.url : "#";
-    return `<tr><td>${contest.platform === "codeforces" ? "CF" : "LC"}</td><td><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(contest.name)}</a></td>` +
-      `<td>${new Date(contest.start).toLocaleString()}</td><td class="n">${Math.round(contest.duration / 60)} min</td></tr>`;
-  }).join("") || "<tr><td>No upcoming contests.</td></tr>";
+    const cf = contest.platform === "codeforces";
+    const when = new Date(contest.start).toLocaleString(undefined, { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    return `<tr><td>${contestTag(contest)}</td><td><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(contest.name)}</a></td>` +
+      `<td class="when">${esc(when)}</td><td class="n">${Math.round(contest.duration / 60)}m</td></tr>`;
+  }).join("") || "<tr><td colspan=\"4\" class=\"empty\">no upcoming contests</td></tr>";
 }
 
 async function loadProfile(user) {
@@ -269,7 +1314,9 @@ async function loadProfile(user) {
 async function refresh() {
   await Promise.all([showLeaderboard(), loadContests()]);
   const { data: latest } = await supabase.from("snapshots").select("taken_at").order("taken_at", { ascending: false }).limit(1).maybeSingle();
-  $("updated").textContent = latest ? `Updated ${new Date(latest.taken_at).toLocaleString()}` : "No snapshots yet";
+  $("updated").textContent = latest
+    ? `Last sync ${new Date(latest.taken_at).toLocaleString(undefined, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
+    : "No snapshots yet";
 }
 
 for (const [key, label] of Object.entries(PERIODS)) {
@@ -285,7 +1332,99 @@ if (!configured) {
   $("board").innerHTML = "<tr><td colspan=\"6\">Supabase configuration required.</td></tr>";
   $("contests").innerHTML = "<tr><td>Supabase configuration required.</td></tr>";
 } else {
-  $("login").onclick = () => clerk?.openSignIn();
+  // ---------- 8-bit sign-in on top of Clerk's sign-in/sign-up API (no Clerk UI) ----------
+  const pageUrl = () => location.origin + location.pathname;
+  const clerkError = e => e?.errors?.[0]?.longMessage || e?.errors?.[0]?.message || e?.message || "Something went wrong.";
+  let pendingFlow = null; // { kind: "signIn" | "signUp", resource }
+  function resetSignin() {
+    pendingFlow = null;
+    $("email-form").hidden = false;
+    $("code-form").hidden = true;
+    $("si-pass-wrap").hidden = true;
+    $("si-pass").value = "";
+    setMessage("si-msg", "");
+  }
+  // Show the pixel spinner on the clicked button while `work` runs; errors land in the dialog.
+  async function busy(button, work) {
+    const label = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = spinner() + label;
+    try {
+      await work();
+    } catch (error) {
+      setMessage("si-msg", clerkError(error));
+    } finally {
+      button.disabled = false;
+      button.innerHTML = label;
+    }
+  }
+  $("login").onclick = () => {
+    resetSignin();
+    $("signin-dialog").showModal();
+    $("si-email").focus();
+  };
+  $("signin-close").onclick = () => $("signin-dialog").close();
+  $("si-back").onclick = resetSignin;
+  for (const button of document.querySelectorAll("[data-oauth]")) {
+    button.onclick = () => busy(button, () => clerk.client.signIn.authenticateWithRedirect({
+      strategy: button.dataset.oauth,
+      redirectUrl: `${pageUrl()}?sso-callback=1`,
+      redirectUrlComplete: pageUrl(),
+    }));
+  }
+  $("email-form").onsubmit = event => {
+    event.preventDefault();
+    busy(event.submitter || $("email-form").querySelector("button"), async () => {
+      const email = $("si-email").value.trim();
+      try {
+        const signIn = await clerk.client.signIn.create({ identifier: email });
+        const factor = signIn.supportedFirstFactors?.find(f => f.strategy === "email_code");
+        if (!factor) throw new Error("Email codes aren't enabled for this account. Use Google or GitHub.");
+        await signIn.prepareFirstFactor({ strategy: "email_code", emailAddressId: factor.emailAddressId });
+        pendingFlow = { kind: "signIn", resource: signIn };
+      } catch (error) {
+        if (error?.errors?.[0]?.code !== "form_identifier_not_found") throw error;
+        // Unknown email: create the account with the same code step.
+        const signUp = await clerk.client.signUp.create({ emailAddress: email });
+        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+        pendingFlow = { kind: "signUp", resource: signUp };
+      }
+      $("si-sent").textContent = email;
+      $("email-form").hidden = true;
+      $("code-form").hidden = false;
+      $("si-code").value = "";
+      $("si-code").focus();
+      setMessage("si-msg", pendingFlow.kind === "signUp" ? "New player! Enter the code to create your account." : "");
+    });
+  };
+  $("code-form").onsubmit = event => {
+    event.preventDefault();
+    busy(event.submitter || $("code-form").querySelector("button[type=submit]"), async () => {
+      let result = pendingFlow.resource;
+      if (pendingFlow.kind === "signIn") {
+        result = await result.attemptFirstFactor({ strategy: "email_code", code: $("si-code").value.trim() });
+      } else {
+        if (result.verifications?.emailAddress?.status !== "verified") {
+          result = await result.attemptEmailAddressVerification({ code: $("si-code").value.trim() });
+        }
+        // If the Clerk app still requires passwords, finish sign-up with one.
+        if (result.status === "missing_requirements" && result.missingFields?.includes("password")) {
+          pendingFlow.resource = result;
+          if (!$("si-pass").value) {
+            $("si-pass-wrap").hidden = false;
+            $("si-pass").focus();
+            throw new Error("Choose a password (8+ characters) to finish creating your account.");
+          }
+          result = await result.update({ password: $("si-pass").value });
+        }
+      }
+      if (result.status !== "complete") {
+        throw new Error(`Couldn't finish (${result.status}${result.missingFields?.length ? `: ${result.missingFields.join(", ")}` : ""}).`);
+      }
+      await clerk.setActive({ session: result.createdSessionId });
+      $("signin-dialog").close();
+    });
+  };
   $("logout").onclick = async () => {
     try {
       await clerk.signOut();
@@ -336,11 +1475,16 @@ if (!configured) {
     setMessage("profile-message", "Saved. Handle verification runs with the next stats update.");
   };
   refresh();
+  document.fonts?.load('8px "Press Start 2P"').then(() => boardRows.length && renderBoard());
   if (!clerkConfigured) {
     setMessage("auth-status", "Sign-in not configured: set CLERK_PUBLISHABLE_KEY in this page.");
   } else {
-    loadClerk().then(instance => {
+    loadClerk().then(async instance => {
       clerk = instance;
+      // Returning from Google/GitHub: let Clerk finish the OAuth sign-in (it redirects back to the clean URL).
+      if (new URLSearchParams(location.search).has("sso-callback")) {
+        await clerk.handleRedirectCallback({ signInFallbackRedirectUrl: pageUrl(), signUpFallbackRedirectUrl: pageUrl() });
+      }
       $("login").disabled = false;
       clerk.addListener(() => loadProfile(currentUser()));
       return loadProfile(currentUser());
