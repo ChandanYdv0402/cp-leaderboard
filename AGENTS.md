@@ -13,25 +13,28 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 - Updated `site/index.html` with Supabase OAuth/email sign-in, profile and handle editing, leaderboard RPC queries, and upcoming contest queries.
 - Split Actions into a scheduled Supabase fetcher (`.github/workflows/update.yml`) and a Pages deployment workflow (`.github/workflows/pages.yml`).
 - Updated `README.md` with setup instructions.
+- Created Supabase project `ttcbdfmwsywdgjcwsllf` and successfully ran `supabase/schema.sql` in its SQL Editor.
+- Configured `site/index.html` with the project's URL and publishable browser key.
+- Set the Supabase Site URL to the GitHub Pages URL and added the Pages and `http://localhost:8000/` auth redirects.
+- Email auth and new-user signups are enabled. The GitHub sign-in button stays hidden until GitHub OAuth credentials are configured.
+- The local site connected to this Supabase project successfully; leaderboard and contest queries returned their expected empty states because no accounts or snapshots exist yet.
+- Added the non-sensitive `SUPABASE_URL` GitHub Actions secret. The `SUPABASE_SERVICE_ROLE_KEY` secret is not configured; it must be entered directly in GitHub and must never be exposed in chat or committed.
 - Existing `users.toml`, `data/snapshots/`, `site/leaderboard.json`, and `site/contests.json` have not been removed. Keep them until the Supabase flow is configured and verified.
-- The browser currently uses placeholder values for the Supabase project URL and anon key in `site/index.html`.
 
 ## Current Blockers / Unverified
 
-- Supabase project setup, schema execution, auth provider configuration, and redirect URL configuration have not been done from this workspace.
-- GitHub Actions secrets `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` still need to be configured by the repository owner.
+- GitHub OAuth is disabled pending a GitHub OAuth app's client ID and secret; email OTP has not been tested end to end.
+- GitHub Actions secret `SUPABASE_SERVICE_ROLE_KEY` still needs to be configured by the repository owner.
 - The fetcher has not been compiled or run: Cargo/Rust is unavailable in the current environment.
-- Browser auth and database behavior have not been exercised against a real Supabase project.
 - Local HTTP preview is available at `http://localhost:8000/` in the current session; it uses a PowerShell server because Python is unavailable.
 
 ## Next Steps
 
-1. Owner creates/configures the Supabase project and runs `supabase/schema.sql`.
-2. Owner enables GitHub OAuth and/or email OTP, configures the Pages redirect URL, and adds the two GitHub Actions secrets.
-3. Replace the placeholder project URL and anon key in `site/index.html` with the public Supabase values. Never put the service-role key in browser code or commit it.
-4. Install/use the Rust toolchain, run formatting and `cargo check`, then run the fetcher against a test Supabase project.
-5. Verify sign-in, own-profile/account RLS, handle verification, leaderboard periods, contest display, and both Actions workflows.
-6. Only after successful verification, decide whether to import or remove the legacy TOML/JSON data.
+1. Add `SUPABASE_SERVICE_ROLE_KEY` as a GitHub Actions secret. Never put the service-role key in browser code or commit it.
+2. Test email OTP sign-in. Configure a GitHub OAuth app and enable the GitHub provider if GitHub sign-in is wanted.
+3. Install/use the Rust toolchain, run formatting and `cargo check`, then run the fetcher against this Supabase project.
+4. Verify own-profile/account RLS, handle verification, leaderboard periods, contest display, and both Actions workflows.
+5. Only after successful verification, decide whether to import or remove the legacy TOML/JSON data.
 
 ## Project Conventions
 

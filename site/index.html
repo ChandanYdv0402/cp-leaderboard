@@ -55,8 +55,9 @@
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+const SUPABASE_URL = "https://ttcbdfmwsywdgjcwsllf.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_I1p51wV_1GUVghTpsFbY5g_ex5cEJL7";
+const GITHUB_AUTH_ENABLED = false;
 const PERIODS = { week: "Weekly", biweek: "Bi-weekly", month: "Monthly", all: "All-time" };
 const esc = s => String(s ?? "–").replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
 const configured = !SUPABASE_URL.includes("YOUR_PROJECT") && !SUPABASE_ANON_KEY.includes("YOUR_SUPABASE");
@@ -99,7 +100,7 @@ async function loadContests() {
 async function loadProfile(user) {
   $("profile").hidden = !user;
   $("logout").hidden = !user;
-  $("github-login").hidden = Boolean(user);
+  $("github-login").hidden = !GITHUB_AUTH_ENABLED || Boolean(user);
   $("email").hidden = Boolean(user);
   $("email-login").hidden = Boolean(user);
   if (!user) {
