@@ -1,24 +1,22 @@
 # CP Leaderboard
 
-Weekly / bi-weekly / monthly / all-time leaderboard for Codeforces + LeetCode, plus upcoming contests.
-Runs entirely on GitHub: Actions fetches stats every 6h, commits a snapshot, and deploys `site/` to Pages.
+Weekly, bi-weekly, monthly, and all-time Codeforces + LeetCode standings, with upcoming contests. Supabase stores profiles, linked handles, snapshots, and contests; GitHub Actions refreshes platform data every six hours and GitHub Pages serves the static site.
+
+## Supabase setup
+
+1. Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in the SQL Editor.
+2. Enable GitHub OAuth and/or email OTP under Authentication. Add `https://chandanydv0402.github.io/cp-leaderboard/` as a redirect URL.
+3. Put the project URL and anon key in the `SUPABASE_URL` and `SUPABASE_ANON_KEY` constants in `site/index.html`. These browser values are public; database access is controlled by RLS.
+4. Add GitHub repository Actions secrets named `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Never put the service-role key in the site or commit it.
+5. In repository Settings → Pages, select **GitHub Actions** as the source. Run the `pages` workflow once, then run `update` to populate initial data.
 
 ## How it works
-- `users.toml` — the list of users (add yourself via PR).
-- `cargo run` — fetches stats, writes `data/snapshots/<time>.json`, `site/leaderboard.json`, `site/contests.json`.
-- A period's score = latest snapshot − snapshot from the start of the period.
-- Scoring: CF problem = rating/100 (unrated = 8), LC Easy/Medium/Hard = 5/10/20.
+
+- Anyone can view the leaderboard and contests. Signed-in users can create their profile and manage their own Codeforces and LeetCode handles.
+- The fetcher reads accounts and stores one snapshot per profile each run. The browser calls `leaderboard(days)` for period standings.
+- A period's score is the latest snapshot minus the last snapshot at or before the period start, or the earliest available snapshot when history is shorter.
+- Scoring: Codeforces problem = rating / 100 (unrated = 8); LeetCode Easy/Medium/Hard = 5/10/20.
 
 ## Run locally
-```
-cargo run
-cd site && python3 -m http.server 8000   # open http://localhost:8000
-```
 
-## Deploy
-1. Push to a GitHub repo (branch `main`).
-2. Settings → Pages → Source: **GitHub Actions**.
-3. Actions → `update` → **Run workflow**.
-
-## Next ideas
-Rating charts, streaks, Discord contest reminders, groups, AtCoder/CodeChef.
+Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in your shell, then run `cargo run`. Serve `site/` over HTTP to test the browser client; configure the project's URL and anon key in `site/index.html` first.

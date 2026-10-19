@@ -8,47 +8,187 @@
   :root { --bg:#fff; --fg:#111; --muted:#666; --line:#e5e5e5; --accent:#2563eb; }
   @media (prefers-color-scheme: dark) { :root { --bg:#0f1115; --fg:#e8e8e8; --muted:#999; --line:#2a2d35; --accent:#60a5fa; } }
   body { background:var(--bg); color:var(--fg); font:15px/1.5 system-ui,sans-serif; max-width:760px; margin:0 auto; padding:24px 16px; }
-  h1 { margin:0 0 4px } .muted { color:var(--muted); font-size:13px }
+  header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  h1 { margin:0 0 4px } h2 { margin-top:28px } .muted { color:var(--muted); font-size:13px }
   .tabs button { background:none; border:1px solid var(--line); color:var(--fg); padding:6px 12px; border-radius:6px; cursor:pointer; margin-right:6px }
   .tabs button.on { border-color:var(--accent); color:var(--accent) }
+  button, input { font:inherit } button { cursor:pointer }
+  .auth, .profile { border-bottom:1px solid var(--line); padding:16px 0; }
+  .auth { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+  .profile form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; align-items:end; }
+  label { display:grid; gap:4px; color:var(--muted); font-size:13px; }
+  input { min-width:0; padding:7px 8px; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:4px; }
+  button.action { padding:7px 10px; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:4px; }
+  button:disabled { opacity:.55; cursor:wait }
+  .message { min-height:1.5em; margin:8px 0 0; color:var(--muted); font-size:13px; }
   table { width:100%; border-collapse:collapse; margin:12px 0 32px } th,td { text-align:left; padding:8px; border-bottom:1px solid var(--line) }
   td.n { text-align:right; font-variant-numeric:tabular-nums } a { color:var(--accent) }
+  @media (max-width:600px) { .profile form { grid-template-columns:1fr; } table { font-size:13px; } th,td { padding:7px 5px; } }
 </style>
 </head>
 <body>
-<h1>CP Leaderboard</h1>
-<div class="muted" id="updated"></div>
+<header>
+  <div><h1>CP Leaderboard</h1><div class="muted" id="updated">Connecting...</div></div>
+  <div class="muted" id="auth-status" aria-live="polite"></div>
+</header>
+<section class="auth" aria-label="Account">
+  <button class="action" id="github-login">Continue with GitHub</button>
+  <input id="email" type="email" autocomplete="email" placeholder="Email for sign-in link" aria-label="Email for sign-in link">
+  <button class="action" id="email-login">Send link</button>
+  <button class="action" id="logout" hidden>Log out</button>
+</section>
+<section class="profile" id="profile" hidden>
+  <h2>My profile</h2>
+  <form id="profile-form">
+    <label>Name<input id="name" required minlength="2" maxlength="32" autocomplete="nickname"></label>
+    <label>Codeforces handle<input id="codeforces" maxlength="40" autocomplete="off"></label>
+    <label>LeetCode username<input id="leetcode" maxlength="40" autocomplete="off"></label>
+    <button class="action" id="save-profile" type="submit">Save profile</button>
+  </form>
+  <p class="message" id="profile-message" aria-live="polite"></p>
+</section>
 <h2>Leaderboard</h2>
 <div class="tabs" id="tabs"></div>
 <table><thead><tr><th>#</th><th>Name</th><th>Points</th><th>Solved</th><th>CF</th><th>LC</th></tr></thead><tbody id="board"></tbody></table>
 <h2>Upcoming contests</h2>
 <table><tbody id="contests"></tbody></table>
-<script>
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
 const PERIODS = { week: "Weekly", biweek: "Bi-weekly", month: "Monthly", all: "All-time" };
 const esc = s => String(s ?? "–").replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
+const configured = !SUPABASE_URL.includes("YOUR_PROJECT") && !SUPABASE_ANON_KEY.includes("YOUR_SUPABASE");
+const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const $ = id => document.getElementById(id);
+const setMessage = (id, text) => { $(id).textContent = text; };
+const showError = (id, error) => setMessage(id, error?.message || "Something went wrong.");
+let currentPeriod = "week";
 
-fetch("leaderboard.json").then(r => r.json()).then(data => {
-  document.getElementById("updated").textContent = "Updated " + new Date(data.updated_at).toLocaleString();
-  const tabs = document.getElementById("tabs");
-  const show = key => {
-    [...tabs.children].forEach(b => b.classList.toggle("on", b.dataset.k === key));
-    document.getElementById("board").innerHTML = data.periods[key].map((r, i) =>
-      `<tr><td>${i + 1}</td><td>${esc(r.name)}</td><td class="n">${r.points}</td><td class="n">${r.solved}</td>` +
-      `<td class="n">${esc(r.cf_rating)}</td><td class="n">${esc(r.lc_rating)}</td></tr>`).join("");
-  };
-  for (const [k, label] of Object.entries(PERIODS)) {
-    const b = document.createElement("button");
-    b.textContent = label; b.dataset.k = k; b.onclick = () => show(k);
-    tabs.appendChild(b);
+async function showLeaderboard(period = currentPeriod) {
+  currentPeriod = period;
+  [...$("tabs").children].forEach(button => button.classList.toggle("on", button.dataset.k === period));
+  $("board").innerHTML = "<tr><td colspan=\"6\">Loading...</td></tr>";
+  const days = { week: 7, biweek: 14, month: 30, all: null }[period];
+  const { data, error } = await supabase.rpc("leaderboard", { days });
+  if (error) {
+    $("board").innerHTML = "<tr><td colspan=\"6\">Leaderboard is unavailable.</td></tr>";
+    return showError("updated", error);
   }
-  show("week");
-});
+  $("board").innerHTML = data.map((row, index) =>
+    `<tr><td>${index + 1}</td><td>${esc(row.name)}</td><td class="n">${row.points}</td><td class="n">${row.solved}</td>` +
+    `<td class="n">${esc(row.cf_rating)}</td><td class="n">${esc(row.lc_rating)}</td></tr>`).join("") ||
+    "<tr><td colspan=\"6\">No leaderboard entries yet.</td></tr>";
+}
 
-fetch("contests.json").then(r => r.json()).then(list => {
-  document.getElementById("contests").innerHTML = list.map(c =>
-    `<tr><td>${c.platform === "codeforces" ? "CF" : "LC"}</td><td><a href="${esc(c.url)}" target="_blank">${esc(c.name)}</a></td>` +
-    `<td>${new Date(c.start * 1000).toLocaleString()}</td><td class="n">${Math.round(c.duration / 60)} min</td></tr>`).join("");
-});
+async function loadContests() {
+  const { data, error } = await supabase.from("contests").select("platform,name,start,duration,url")
+    .gte("start", new Date().toISOString()).order("start");
+  if (error) {
+    $("contests").innerHTML = "<tr><td>Contests are unavailable.</td></tr>";
+    return;
+  }
+  $("contests").innerHTML = data.map(contest => {
+    const url = /^https:\/\//i.test(contest.url) ? contest.url : "#";
+    return `<tr><td>${contest.platform === "codeforces" ? "CF" : "LC"}</td><td><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(contest.name)}</a></td>` +
+      `<td>${new Date(contest.start).toLocaleString()}</td><td class="n">${Math.round(contest.duration / 60)} min</td></tr>`;
+  }).join("") || "<tr><td>No upcoming contests.</td></tr>";
+}
+
+async function loadProfile(user) {
+  $("profile").hidden = !user;
+  $("logout").hidden = !user;
+  $("github-login").hidden = Boolean(user);
+  $("email").hidden = Boolean(user);
+  $("email-login").hidden = Boolean(user);
+  if (!user) {
+    $("auth-status").textContent = "";
+    return;
+  }
+  $("auth-status").textContent = user.email || "Signed in";
+  const [{ data: profile }, { data: accounts, error }] = await Promise.all([
+    supabase.from("profiles").select("name").eq("id", user.id).maybeSingle(),
+    supabase.from("accounts").select("platform,handle,verified").eq("user_id", user.id)
+  ]);
+  if (error) return showError("profile-message", error);
+  $("name").value = profile?.name || user.user_metadata?.full_name || "";
+  $("codeforces").value = accounts.find(account => account.platform === "codeforces")?.handle || "";
+  $("leetcode").value = accounts.find(account => account.platform === "leetcode")?.handle || "";
+  const pending = accounts.filter(account => !account.verified).map(account => account.platform);
+  setMessage("profile-message", pending.length ? `Pending verification: ${pending.join(", ")}.` : "");
+}
+
+async function refresh() {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error) showError("auth-status", error);
+  await loadProfile(session?.user || null);
+  await Promise.all([showLeaderboard(), loadContests()]);
+  const { data: latest } = await supabase.from("snapshots").select("taken_at").order("taken_at", { ascending: false }).limit(1).maybeSingle();
+  $("updated").textContent = latest ? `Updated ${new Date(latest.taken_at).toLocaleString()}` : "No snapshots yet";
+}
+
+for (const [key, label] of Object.entries(PERIODS)) {
+  const button = document.createElement("button");
+  button.textContent = label;
+  button.dataset.k = key;
+  button.onclick = () => showLeaderboard(key);
+  $("tabs").appendChild(button);
+}
+
+if (!configured) {
+  $("updated").textContent = "Set the Supabase project URL and anon key in this page to connect.";
+  $("github-login").disabled = true;
+  $("email-login").disabled = true;
+  $("board").innerHTML = "<tr><td colspan=\"6\">Supabase configuration required.</td></tr>";
+  $("contests").innerHTML = "<tr><td>Supabase configuration required.</td></tr>";
+} else {
+  $("github-login").onclick = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "github", options: { redirectTo: window.location.href.split("#")[0] } });
+    if (error) showError("auth-status", error);
+  };
+  $("email-login").onclick = async () => {
+    const email = $("email").value.trim();
+    if (!email) return setMessage("auth-status", "Enter your email address first.");
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.href.split("#")[0] } });
+    setMessage("auth-status", error ? error.message : "Sign-in link sent. Check your email.");
+  };
+  $("logout").onclick = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) showError("auth-status", error);
+    else await refresh();
+  };
+  $("profile-form").onsubmit = async event => {
+    event.preventDefault();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return setMessage("profile-message", "Sign in before saving a profile.");
+    const button = $("save-profile");
+    button.disabled = true;
+    setMessage("profile-message", "Saving...");
+    const { error: profileError } = await supabase.from("profiles").upsert(
+      { id: user.id, name: $("name").value.trim() }, { onConflict: "id" });
+    if (profileError) {
+      button.disabled = false;
+      return showError("profile-message", profileError);
+    }
+    for (const [platform, inputId] of [["codeforces", "codeforces"], ["leetcode", "leetcode"]]) {
+      const handle = $(inputId).value.trim();
+      const query = supabase.from("accounts").delete().eq("user_id", user.id).eq("platform", platform);
+      const result = handle
+        ? await supabase.from("accounts").upsert(
+          { user_id: user.id, platform, handle, verified: false }, { onConflict: "user_id,platform" })
+        : await query;
+      if (result.error) {
+        button.disabled = false;
+        return showError("profile-message", result.error);
+      }
+    }
+    button.disabled = false;
+    setMessage("profile-message", "Saved. Handle verification runs with the next stats update.");
+  };
+  supabase.auth.onAuthStateChange((_event, session) => loadProfile(session?.user || null));
+  refresh();
+}
 </script>
 </body>
 </html>

@@ -2,45 +2,32 @@ name: update
 
 on:
   schedule:
-    - cron: "0 */6 * * *"   # every 6 hours
-  workflow_dispatch:         # manual "Run workflow" button
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
   push:
     branches: [main]
-    paths: [users.toml, src/**, site/index.html]
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - src/**
+      - .github/workflows/update.yml
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 concurrency:
-  group: update
+  group: leaderboard-fetcher
   cancel-in-progress: false
 
 jobs:
   update:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-
-      - name: Fetch stats and build leaderboard
+      - name: Fetch stats and update Supabase
         run: cargo run --release
-
-      - name: Commit snapshot
-        run: |
-          git config user.name "leaderboard-bot"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data site
-          git diff --cached --quiet || (git commit -m "snapshot [skip ci]" && git push)
-
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-      - id: deploy
-        uses: actions/deploy-pages@v4
