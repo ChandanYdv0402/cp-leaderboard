@@ -30,6 +30,8 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 
 - Switched sign-in from Supabase Auth (Google/email OTP) to Clerk via Supabase third-party auth: `site/index.html` loads clerk-js from jsDelivr, passes the Clerk session token to supabase-js through `accessToken`, and uses Clerk's sign-in modal. `supabase/schema.sql` now uses text user ids and `auth.jwt() ->> 'sub'` in RLS; `supabase/clerk_migration.sql` converts an existing project. The fetcher needed no change (service-role key, string ids).
 
+- Added Platform (All/LeetCode/Codeforces) and Sort by (Score/Questions solved/Rating) dropdowns. `leaderboard(days)` now also returns `cf_points`, `cf_solved`, `lc_points`, `lc_solved` derived from snapshot `stats` JSON; `supabase/leaderboard_by_platform.sql` drops and recreates it for existing projects. Until it is run, per-platform values show as "–".
+
 ## Current Blockers / Unverified
 
 - Supabase Auth (Google OAuth / email OTP) is no longer used by the site; login providers are now configured in Clerk. Clerk sign-in, token acceptance by Supabase, and RLS writes with Clerk ids are untested.

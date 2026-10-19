@@ -19,7 +19,7 @@ Weekly, bi-weekly, monthly, and all-time Codeforces + LeetCode standings, with u
 ## How it works
 
 - Anyone can view the leaderboard and contests. Signed-in users can create their profile and manage their own Codeforces and LeetCode handles. Handle fields accept a username or profile URL, normalize supported URLs to usernames, and link to the matching public profile.
-- The fetcher reads accounts and stores one snapshot per profile each run. The browser calls `leaderboard(days)` for period standings.
+- The fetcher reads accounts and stores one snapshot per profile each run. The browser calls `leaderboard(days)` for period standings. It returns combined and per-platform (Codeforces / LeetCode) points and solved counts; the site's Platform and Sort by dropdowns filter and re-sort these client-side. Existing projects: run [`supabase/leaderboard_by_platform.sql`](supabase/leaderboard_by_platform.sql) once.
 - A period's score is the latest snapshot minus the last snapshot at or before the period start, or the earliest available snapshot when history is shorter.
 - Scoring: Codeforces problem = rating / 100 (unrated = 8); LeetCode Easy/Medium/Hard = 5/10/20.
 

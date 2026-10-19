@@ -11,6 +11,10 @@
   h1 { margin:0 0 4px } h2 { margin-top:28px } .muted { color:var(--muted); font-size:13px }
   .tabs button { background:none; border:1px solid var(--line); color:var(--fg); padding:6px 12px; border-radius:6px; cursor:pointer; margin-right:6px }
   .tabs button.on { border-color:var(--accent); color:var(--accent) }
+  .board-bar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+  .filters { display:flex; gap:12px; margin-left:auto; }
+  .filters label { display:flex; align-items:center; gap:6px; }
+  select { font:inherit; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 8px; }
   button, input { font:inherit } button { cursor:pointer }
   .auth, .profile { border-bottom:1px solid var(--line); padding:16px 0; }
   .auth { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
@@ -46,8 +50,26 @@
   <p class="message" id="profile-message" aria-live="polite"></p>
 </section>
 <h2>Leaderboard</h2>
-<div class="tabs" id="tabs"></div>
-<table><thead><tr><th>#</th><th>Name</th><th>Points</th><th>Solved</th><th>CF</th><th>LC</th></tr></thead><tbody id="board"></tbody></table>
+<div class="board-bar">
+  <div class="tabs" id="tabs"></div>
+  <div class="filters">
+    <label>Platform
+      <select id="platform">
+        <option value="all">All</option>
+        <option value="lc">LeetCode</option>
+        <option value="cf">Codeforces</option>
+      </select>
+    </label>
+    <label>Sort by
+      <select id="sort">
+        <option value="points">Score</option>
+        <option value="solved">Questions solved</option>
+        <option value="rating">Rating</option>
+      </select>
+    </label>
+  </div>
+</div>
+<table><thead><tr><th>#</th><th>Name</th><th>Points</th><th>Solved</th><th id="cf-head">CF</th><th id="lc-head">LC</th></tr></thead><tbody id="board"></tbody></table>
 <h2>Upcoming contests</h2>
 <table><tbody id="contests"></tbody></table>
 <script type="module">
@@ -141,6 +163,7 @@ function currentUser() {
   return { id: u.id, email: u.primaryEmailAddress?.emailAddress || "", name: u.fullName || u.username || "" };
 }
 let currentPeriod = "week";
+let boardRows = [];
 let profileLoadedFor = null;
 
 async function showLeaderboard(period = currentPeriod) {
@@ -149,15 +172,44 @@ async function showLeaderboard(period = currentPeriod) {
   $("board").innerHTML = "<tr><td colspan=\"6\">Loading...</td></tr>";
   const days = { week: 7, biweek: 14, month: 30, all: null }[period];
   const { data, error } = await supabase.rpc("leaderboard", { days });
+  if (period !== currentPeriod) return; // a newer tab click won
   if (error) {
     $("board").innerHTML = "<tr><td colspan=\"6\">Leaderboard is unavailable.</td></tr>";
     return showError("updated", error);
   }
-  $("board").innerHTML = data.map((row, index) =>
-    `<tr><td>${index + 1}</td><td>${esc(row.name)}</td><td class="n">${row.points}</td><td class="n">${row.solved}</td>` +
-    `<td class="n">${esc(row.cf_rating)}</td><td class="n">${esc(row.lc_rating)}</td></tr>`).join("") ||
-    "<tr><td colspan=\"6\">No leaderboard entries yet.</td></tr>";
+  boardRows = data;
+  renderBoard();
 }
+
+// Re-render from the last fetched rows; platform/sort changes need no new request.
+function renderBoard() {
+  const platform = $("platform").value;
+  const sort = $("sort").value;
+  $("cf-head").hidden = platform === "lc";
+  $("lc-head").hidden = platform === "cf";
+  const rows = boardRows.map(row => {
+    const pick = (cf, lc, all) => platform === "cf" ? cf : platform === "lc" ? lc : all;
+    return {
+      name: row.name,
+      cf_rating: row.cf_rating,
+      lc_rating: row.lc_rating,
+      // Per-platform fields come from the updated leaderboard() SQL; "–" until it is installed.
+      points: pick(row.cf_points, row.lc_points, row.points),
+      solved: pick(row.cf_solved, row.lc_solved, row.solved),
+      rating: pick(row.cf_rating, row.lc_rating, Math.max(row.cf_rating ?? -1, row.lc_rating ?? -1)),
+    };
+  });
+  const key = r => (sort === "rating" ? r.rating : r[sort]) ?? -1;
+  rows.sort((a, b) => key(b) - key(a) || (b.points ?? 0) - (a.points ?? 0));
+  const cols = 4 + (platform === "all" ? 2 : 1);
+  $("board").innerHTML = rows.map((row, index) =>
+    `<tr><td>${index + 1}</td><td>${esc(row.name)}</td><td class="n">${esc(row.points)}</td><td class="n">${esc(row.solved)}</td>` +
+    (platform !== "lc" ? `<td class="n">${esc(row.cf_rating)}</td>` : "") +
+    (platform !== "cf" ? `<td class="n">${esc(row.lc_rating)}</td>` : "") + "</tr>").join("") ||
+    `<tr><td colspan="${cols}">No leaderboard entries yet.</td></tr>`;
+}
+$("platform").addEventListener("change", renderBoard);
+$("sort").addEventListener("change", renderBoard);
 
 async function loadContests() {
   const { data, error } = await supabase.from("contests").select("platform,name,start,duration,url")
