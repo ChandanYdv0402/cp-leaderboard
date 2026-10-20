@@ -177,6 +177,32 @@
   .chart-bar { display:flex; align-items:center; gap:10px; margin-top:16px; padding-top:14px; border-top:1px dashed var(--rail); }
   .chart-bar::before { content:"CHART"; color:var(--faint); font:8px/1 var(--pixel); }
   /* Chart screen: stepped pixel frame and faint scanlines */
+  /* Next-contest countdown */
+  .countdown { margin:4px; padding:16px 14px; text-align:center; }
+  .cd-name { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:14px; font-size:12.5px; }
+  .cd-clock { display:flex; justify-content:center; gap:10px; }
+  .cd-unit { display:grid; gap:7px; min-width:3.6em; }
+  .cd-unit b { --px-c:var(--line); display:block; margin:4px; padding:10px 0 8px; background:var(--track); box-shadow:var(--px-frame); font:clamp(14px, 2.2vw, 20px)/1 var(--pixel); color:var(--fg); }
+  .cd-unit span { color:var(--faint); font:6.5px/1 var(--pixel); letter-spacing:.5px; }
+  .cd-unit.soon b { color:var(--hot); }
+  .cd-meta { margin-top:14px; color:var(--muted); font-size:11.5px; }
+  .cd-meta a { margin-left:8px; }
+
+  /* Solve heatmap: one row of day squares per player */
+  .heatmap { display:grid; gap:14px; min-width:0; }
+  .heatmap > * { min-width:0; }
+  .hm-row h4 { display:flex; align-items:center; justify-content:space-between; margin:0 0 6px; font:8px/1.4 var(--pixel); }
+  .hm-row h4 span { color:var(--faint); font-size:7px; }
+  .hm-grid { display:grid; grid-auto-flow:column; grid-template-rows:repeat(7, 11px); grid-auto-columns:11px; gap:3px; overflow-x:auto; padding-bottom:2px; }
+  .hm-grid i { width:11px; height:11px; background:var(--track); }
+  .hm-grid i[data-l="1"] { background:color-mix(in srgb, var(--hm) 35%, var(--track)); }
+  .hm-grid i[data-l="2"] { background:color-mix(in srgb, var(--hm) 60%, var(--track)); }
+  .hm-grid i[data-l="3"] { background:color-mix(in srgb, var(--hm) 82%, var(--track)); }
+  .hm-grid i[data-l="4"] { background:var(--hm); }
+  .hm-grid i.future { background:transparent; }
+  .hm-foot { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; color:var(--faint); font:7px/1.4 var(--pixel); }
+  .hm-scale { display:flex; align-items:center; gap:3px; }
+  .hm-scale i { width:9px; height:9px; }
   .screen { --px-c:var(--line); background:repeating-linear-gradient(0deg, rgba(255,255,255,.022) 0 1px, transparent 1px 3px), var(--bg); box-shadow:var(--px-frame); }
   .chart-wrap { position:relative; margin:16px 4px 0; padding:14px 12px 10px; }
   .chart-note { color:var(--faint); font-size:12px; margin:8px 0 0; }
@@ -483,6 +509,14 @@
 <section class="panel">
 <h2 class="panel-title">Upcoming contests</h2>
 <table><thead><tr><th>Site</th><th>Contest</th><th>Starts</th><th class="n">Len</th></tr></thead><tbody id="contests"></tbody></table>
+</section>
+<section class="panel">
+<h2 class="panel-title">Next contest</h2>
+<div class="countdown screen" id="countdown"></div>
+</section>
+<section class="panel">
+<h2 class="panel-title">Solve heatmap</h2>
+<div class="heatmap" id="heatmap"></div>
 </section>
 </div>
 </main>
@@ -1391,6 +1425,104 @@ $("duel-shuffle").onclick = () => {
   renderArena();
 };
 
+// ---------- Next-contest countdown ----------
+// Ticks every second over the contests already loaded for the table; rolls to the next one at zero.
+function renderCountdown() {
+  const now = Date.now();
+  const next = contestsData.find(c => new Date(c.start).getTime() > now);
+  if (!next) {
+    $("countdown").innerHTML = `<div class="loading">no upcoming contests</div>`;
+    return;
+  }
+  const left = new Date(next.start).getTime() - now;
+  const parts = [["days", Math.floor(left / 864e5)], ["hrs", Math.floor(left / 36e5) % 24], ["min", Math.floor(left / 6e4) % 60], ["sec", Math.floor(left / 1e3) % 60]];
+  const soon = left < 36e5 ? " soon" : ""; // last hour: digits turn red
+  const url = /^https:\/\//i.test(next.url) ? next.url : "#";
+  const when = new Date(next.start).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  $("countdown").innerHTML =
+    `<div class="cd-name">${contestTag(next)}<span>${esc(next.name)}</span></div>` +
+    `<div class="cd-clock" role="timer" aria-label="Time until ${esc(next.name)}">` +
+    parts.map(([label, value]) => `<div class="cd-unit${soon}"><b>${String(value).padStart(2, "0")}</b><span>${label}</span></div>`).join("") +
+    `</div><div class="cd-meta">${esc(when)} · ${Math.round(next.duration / 60)}m<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open ↗</a></div>`;
+}
+$("countdown").innerHTML = `<div class="loading">${spinner()}loading</div>`;
+setInterval(() => contestsData.length && renderCountdown(), 1000);
+
+// ---------- Solve heatmap ----------
+// Problems solved per day = sum of increases between consecutive snapshots, counted on the later snapshot's day.
+const HEATMAP_WEEKS = 26;
+let heatmapData = null;
+async function loadHeatmap() {
+  const since = new Date();
+  since.setHours(0, 0, 0, 0);
+  since.setDate(since.getDate() - HEATMAP_WEEKS * 7 - 1); // one extra day as the baseline
+  const [{ data: profiles, error: profileError }, snaps] = await Promise.all([
+    supabase.from("profiles").select("id,name"),
+    (async () => {
+      const rows = [];
+      for (let from = 0; ; from += 1000) { // PostgREST caps responses at 1000 rows
+        const { data, error } = await supabase.from("snapshots").select("user_id,taken_at,solved,stats")
+          .gte("taken_at", since.toISOString()).order("taken_at").range(from, from + 999);
+        if (error) throw error;
+        rows.push(...data);
+        if (data.length < 1000) return rows;
+      }
+    })(),
+  ]);
+  if (profileError) throw profileError;
+  heatmapData = { names: new Map(profiles.map(p => [p.id, p.name])), snaps };
+  renderHeatmap();
+}
+function renderHeatmap() {
+  if (!heatmapData) return;
+  const platform = $("platform").value;
+  const solvedOf = snap => {
+    const st = snap.stats || {};
+    const lc = (st.lc_easy ?? 0) + (st.lc_medium ?? 0) + (st.lc_hard ?? 0);
+    return platform === "cf" ? st.cf_solved ?? 0 : platform === "lc" ? lc : snap.solved;
+  };
+  // Grid: HEATMAP_WEEKS full weeks ending with the current week (columns = weeks, rows = Sun..Sat).
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(today);
+  start.setDate(today.getDate() - today.getDay() - (HEATMAP_WEEKS - 1) * 7);
+  const days = Array.from({ length: HEATMAP_WEEKS * 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+  // Gains per user per day. Snapshots arrive sorted by time; each one's increase over the previous
+  // snapshot of the same user goes to its own day (a user's very first snapshot has nothing to compare to).
+  const gainsByUser = new Map(); // user -> Map(dayKey -> solved that day)
+  const lastSolved = new Map();  // user -> solved count at their previous snapshot
+  for (const snap of heatmapData.snaps) {
+    if (!gainsByUser.has(snap.user_id)) gainsByUser.set(snap.user_id, new Map());
+    const value = solvedOf(snap), prev = lastSolved.get(snap.user_id);
+    lastSolved.set(snap.user_id, value);
+    const taken = new Date(snap.taken_at);
+    if (prev == null || taken < start) continue;
+    const key = dayKey(taken), gains = gainsByUser.get(snap.user_id);
+    gains.set(key, (gains.get(key) ?? 0) + Math.max(0, value - prev));
+  }
+  const color = platform === "cf" ? "var(--cf)" : platform === "lc" ? "var(--lc)" : "var(--gold)";
+  const rows = [...gainsByUser].map(([userId, gains]) => {
+    let total = 0;
+    const cells = days.map(d => {
+      if (d > today) return `<i class="future"></i>`;
+      const gained = gains.get(dayKey(d)) ?? 0;
+      total += gained;
+      const level = gained === 0 ? 0 : gained < 2 ? 1 : gained < 4 ? 2 : gained < 7 ? 3 : 4;
+      const label = `${d.toLocaleDateString(undefined, { day: "numeric", month: "short" })}: ${gained} solved`;
+      return `<i data-l="${level}" title="${esc(label)}"></i>`;
+    }).join("");
+    const name = heatmapData.names.get(userId) || "Unknown";
+    return { total, html: `<div class="hm-row"><h4><span style="color:var(--fg);display:flex;align-items:center">${avatar(name)}${esc(name)}</span><span>${total} in ${HEATMAP_WEEKS}w</span></h4><div class="hm-grid">${cells}</div></div>` };
+  }).sort((a, b) => b.total - a.total);
+  $("heatmap").style.setProperty("--hm", color);
+  $("heatmap").innerHTML = (rows.map(r => r.html).join("") || `<div class="loading">no snapshots yet</div>`) +
+    `<div class="hm-foot"><span>${platform === "all" ? "All platforms" : platform === "cf" ? "Codeforces" : "LeetCode"} · fills in as snapshots are saved</span>` +
+    `<span class="hm-scale">less${[0, 1, 2, 3, 4].map(l => `<i data-l="${l}" style="background:${l ? `color-mix(in srgb, ${color} ${[0, 35, 60, 82, 100][l]}%, var(--track))` : "var(--track)"}"></i>`).join("")}more</span></div>`;
+  for (const grid of $("heatmap").querySelectorAll(".hm-grid")) grid.scrollLeft = grid.scrollWidth; // newest weeks in view
+}
+$("heatmap").innerHTML = `<div class="loading">${spinner()}loading</div>`;
+$("platform").addEventListener("change", renderHeatmap);
+
 async function loadContests() {
   $("contests").innerHTML = loadingRow(4);
   const { data, error } = await supabase.from("contests").select("platform,name,start,duration,url")
@@ -1403,6 +1535,7 @@ async function loadContests() {
   contestsData = data;
   if (!calSelected && data.length) calSelected = dayKey(new Date(data[0].start)); // preselect the next contest day
   renderCalendar();
+  renderCountdown();
   $("contests").innerHTML = data.map(contest => {
     const url = /^https:\/\//i.test(contest.url) ? contest.url : "#";
     const cf = contest.platform === "codeforces";
@@ -1444,6 +1577,7 @@ async function loadProfile(user) {
 }
 
 async function refresh() {
+  loadHeatmap().catch(() => { $("heatmap").innerHTML = `<div class="loading">heatmap unavailable</div>`; });
   await Promise.all([showLeaderboard(), loadContests()]);
   const { data: latest } = await supabase.from("snapshots").select("taken_at").order("taken_at", { ascending: false }).limit(1).maybeSingle();
   $("updated").textContent = latest

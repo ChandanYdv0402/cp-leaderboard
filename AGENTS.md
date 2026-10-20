@@ -39,6 +39,8 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 
 - Added beginner-oriented comments throughout `src/main.rs`, `src/platforms.rs` and `Cargo.toml` (comments only; a comment-stripped diff against HEAD shows identical code, `cargo check` not run), plus a Rust learning guide in `docs/learn/` (big picture, Rust basics, ownership, Option/Result, Cargo, per-file walkthroughs, exercises). Keep these in sync when the Rust code changes.
 
+- Added two panels under Upcoming contests in `site/index.html`: **Next contest** (per-second countdown over the already-loaded `contestsData`, red digits in the last hour, rolls to the next contest) and **Solve heatmap** (26 weeks × 7 days per player; daily solved = sum of increases between consecutive snapshots, counted on the later snapshot's day; follows the Platform select; grids scroll to the newest weeks on narrow screens). Verified locally on real data (Chandan's 1 solve on 19 Oct), at phone width, and with a non-default theme. Uncommitted.
+
 ## Current Blockers / Unverified
 
 - Supabase Auth (Google OAuth / email OTP) is no longer used by the site; login providers are now configured in Clerk. Clerk sign-in, token acceptance by Supabase, and RLS writes with Clerk ids are untested.
