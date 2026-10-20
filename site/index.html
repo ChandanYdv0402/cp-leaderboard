@@ -528,7 +528,7 @@
 <dialog class="signin" id="signin-dialog" aria-labelledby="signin-title">
   <div class="dlg">
     <div class="dlg-head"><h2 id="signin-title">Sign in</h2><button class="x" id="signin-close" aria-label="Close">×</button></div>
-    <p class="dlg-sub">Join the board. New emails get an account automatically.</p>
+    <p class="dlg-sub" id="si-sub">Join the board. New emails get an account automatically.</p>
     <div class="oauth">
       <button class="btn btn-ghost" data-oauth="oauth_google">Google</button>
       <button class="btn btn-ghost" data-oauth="oauth_github">GitHub</button>
@@ -556,6 +556,9 @@ const SUPABASE_ANON_KEY = "sb_publishable_I1p51wV_1GUVghTpsFbY5g_ex5cEJL7";
 // Clerk publishable key (pk_test_... / pk_live_...) — public, safe to commit. Login providers are chosen in the Clerk dashboard.
 const CLERK_PUBLISHABLE_KEY = "pk_test_dHJ1ZS1qYXktNjE1Ny5jbGVyay5hY2NvdW50cy5kZXYk";
 const CLERK_JS_URL = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js";
+// New sign-ups are closed: only existing players can sign in. Flip to true (and see
+// supabase/close_registration.sql) to let new people join again.
+const REGISTRATION_OPEN = false;
 const PERIODS = { week: "Weekly", biweek: "Bi-weekly", month: "Monthly", all: "All-time" };
 const esc = s => String(s ?? "–").replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
 const configured = !SUPABASE_URL.includes("YOUR_PROJECT") && !SUPABASE_ANON_KEY.includes("YOUR_SUPABASE");
@@ -1624,6 +1627,7 @@ if (!configured) {
       button.innerHTML = label;
     }
   }
+  if (!REGISTRATION_OPEN) $("si-sub").textContent = "Registration is closed. Existing players only.";
   $("login").onclick = () => {
     resetSignin();
     $("signin-dialog").showModal();
@@ -1650,6 +1654,7 @@ if (!configured) {
         pendingFlow = { kind: "signIn", resource: signIn };
       } catch (error) {
         if (error?.errors?.[0]?.code !== "form_identifier_not_found") throw error;
+        if (!REGISTRATION_OPEN) throw new Error("Registration is closed. Only existing players can sign in.");
         // Unknown email: create the account with the same code step.
         const signUp = await clerk.client.signUp.create({ emailAddress: email });
         await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
