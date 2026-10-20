@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CP Leaderboard</title>
+<script>try { const t = localStorage.getItem("cp-theme"); if (t && t !== "default") document.documentElement.dataset.theme = t; } catch {}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -16,10 +17,112 @@
     --fg:#f5f5f5; --muted:#a3a3a3; --faint:#6b6b6b; --line:#262626; --rail:rgba(255,255,255,.1);
     --primary:#e4e4e4; --primary-fg:#121212; --ring:#737373;
     --cf:#5fa8d3; --lc:#e0a43a; --all:#c9c9c9; --gold:#d4b33a; --hot:#ff4d4d;
+    --sel:#262626; --track:#1a1a1a; --track-2:#222;
     --pixel:"Press Start 2P", ui-monospace, monospace;
     --text:ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     --chart-font:ui-monospace, SFMono-Regular, Menlo, monospace;
   }
+  /* Themes: dark palettes from 8bitcn/ui (lib/themes.ts), mapped onto this page's tokens. Default keeps the tuned grayscale above. */
+  :root[data-theme="sega"] { --bg:oklch(0.1 0.1 280); --fg:oklch(0.9 0.02 260); --panel:color-mix(in oklch, oklch(0.1 0.1 280), oklch(0.9 0.02 260) 6%); --head:color-mix(in oklch, oklch(0.1 0.1 280), oklch(0.9 0.02 260) 11%);
+    --row:color-mix(in oklch, oklch(0.1 0.1 280), oklch(0.9 0.02 260) 3%); --hover:color-mix(in oklch, oklch(0.1 0.1 280), oklch(0.9 0.02 260) 8%); --sel:color-mix(in oklch, oklch(0.1 0.1 280), oklch(0.9 0.02 260) 16%);
+    --track:color-mix(in oklch, oklch(0.1 0.1 280), oklch(0.9 0.02 260) 10%); --track-2:color-mix(in oklch, oklch(0.1 0.1 280), oklch(0.9 0.02 260) 14%);
+    --muted:oklch(0.85 0.1 220); --faint:color-mix(in oklch, oklch(0.85 0.1 220) 55%, oklch(0.1 0.1 280)); --line:oklch(0.5 0.2 260); --rail:color-mix(in oklch, oklch(0.9 0.02 260) 14%, transparent);
+    --primary:oklch(0.5 0.2 260); --primary-fg:oklch(0.9 0.02 260); --ring:oklch(0.5 0.2 260); --hot:oklch(0.5 0.2 20); }
+  :root[data-theme="gameboy"] { --bg:oklch(0.2 0.1 140); --fg:oklch(0.8 0.2 120); --panel:color-mix(in oklch, oklch(0.2 0.1 140), oklch(0.8 0.2 120) 6%); --head:color-mix(in oklch, oklch(0.2 0.1 140), oklch(0.8 0.2 120) 11%);
+    --row:color-mix(in oklch, oklch(0.2 0.1 140), oklch(0.8 0.2 120) 3%); --hover:color-mix(in oklch, oklch(0.2 0.1 140), oklch(0.8 0.2 120) 8%); --sel:color-mix(in oklch, oklch(0.2 0.1 140), oklch(0.8 0.2 120) 16%);
+    --track:color-mix(in oklch, oklch(0.2 0.1 140), oklch(0.8 0.2 120) 10%); --track-2:color-mix(in oklch, oklch(0.2 0.1 140), oklch(0.8 0.2 120) 14%);
+    --muted:oklch(0.7 0.2 120); --faint:color-mix(in oklch, oklch(0.7 0.2 120) 55%, oklch(0.2 0.1 140)); --line:oklch(0.4 0.2 140); --rail:color-mix(in oklch, oklch(0.8 0.2 120) 14%, transparent);
+    --primary:oklch(0.7 0.2 120); --primary-fg:oklch(0.2 0.1 140); --ring:oklch(0.8 0.2 120); --hot:oklch(0.5 0.3 30); }
+  :root[data-theme="atari"] { --bg:oklch(0.2 0 0); --fg:oklch(0.9 0 0); --panel:color-mix(in oklch, oklch(0.4 0 0), oklch(0.9 0 0) 6%); --head:color-mix(in oklch, oklch(0.4 0 0), oklch(0.9 0 0) 11%);
+    --row:color-mix(in oklch, oklch(0.2 0 0), oklch(0.9 0 0) 3%); --hover:color-mix(in oklch, oklch(0.2 0 0), oklch(0.9 0 0) 8%); --sel:color-mix(in oklch, oklch(0.2 0 0), oklch(0.9 0 0) 16%);
+    --track:color-mix(in oklch, oklch(0.2 0 0), oklch(0.9 0 0) 10%); --track-2:color-mix(in oklch, oklch(0.2 0 0), oklch(0.9 0 0) 14%);
+    --muted:oklch(0.7 0 0); --faint:color-mix(in oklch, oklch(0.7 0 0) 55%, oklch(0.2 0 0)); --line:oklch(0.4 0 0); --rail:color-mix(in oklch, oklch(0.9 0 0) 14%, transparent);
+    --primary:oklch(0.4 0.2 60); --primary-fg:oklch(0.9 0 0); --ring:oklch(0 0 0); --hot:oklch(0.4 0.3 20); }
+  :root[data-theme="nintendo"] { --bg:oklch(0.16 0.05 260); --fg:oklch(1 0 0); --panel:color-mix(in oklch, oklch(0.2 0.06 260), oklch(1 0 0) 6%); --head:color-mix(in oklch, oklch(0.2 0.06 260), oklch(1 0 0) 11%);
+    --row:color-mix(in oklch, oklch(0.16 0.05 260), oklch(1 0 0) 3%); --hover:color-mix(in oklch, oklch(0.16 0.05 260), oklch(1 0 0) 8%); --sel:color-mix(in oklch, oklch(0.16 0.05 260), oklch(1 0 0) 16%);
+    --track:color-mix(in oklch, oklch(0.16 0.05 260), oklch(1 0 0) 10%); --track-2:color-mix(in oklch, oklch(0.16 0.05 260), oklch(1 0 0) 14%);
+    --muted:oklch(0.7 0 0); --faint:color-mix(in oklch, oklch(0.7 0 0) 55%, oklch(0.16 0.05 260)); --line:oklch(1 0 0); --rail:color-mix(in oklch, oklch(1 0 0) 14%, transparent);
+    --primary:oklch(0.5 0.2 280); --primary-fg:oklch(0.9 0.05 280); --ring:oklch(0.7 0.15 250); --hot:oklch(0.4 0.2 10); }
+  :root[data-theme="arcade"] { --bg:oklch(0.02 0.01 280); --fg:oklch(0.98 0.01 280); --panel:color-mix(in oklch, oklch(0.05 0.02 280), oklch(0.98 0.01 280) 6%); --head:color-mix(in oklch, oklch(0.05 0.02 280), oklch(0.98 0.01 280) 11%);
+    --row:color-mix(in oklch, oklch(0.02 0.01 280), oklch(0.98 0.01 280) 3%); --hover:color-mix(in oklch, oklch(0.02 0.01 280), oklch(0.98 0.01 280) 8%); --sel:color-mix(in oklch, oklch(0.02 0.01 280), oklch(0.98 0.01 280) 16%);
+    --track:color-mix(in oklch, oklch(0.02 0.01 280), oklch(0.98 0.01 280) 10%); --track-2:color-mix(in oklch, oklch(0.02 0.01 280), oklch(0.98 0.01 280) 14%);
+    --muted:oklch(0.8 0.1 280); --faint:color-mix(in oklch, oklch(0.8 0.1 280) 55%, oklch(0.02 0.01 280)); --line:oklch(0.8 0.3 320); --rail:color-mix(in oklch, oklch(0.98 0.01 280) 14%, transparent);
+    --primary:oklch(0.8 0.3 320); --primary-fg:oklch(0.05 0.02 320); --ring:oklch(0.6 0.25 320); --hot:oklch(0.8 0.35 20); }
+  :root[data-theme="neo-geo"] { --bg:oklch(0.05 0.02 25); --fg:oklch(0.95 0.01 25); --panel:color-mix(in oklch, oklch(0.1 0.03 25), oklch(0.95 0.01 25) 6%); --head:color-mix(in oklch, oklch(0.1 0.03 25), oklch(0.95 0.01 25) 11%);
+    --row:color-mix(in oklch, oklch(0.05 0.02 25), oklch(0.95 0.01 25) 3%); --hover:color-mix(in oklch, oklch(0.05 0.02 25), oklch(0.95 0.01 25) 8%); --sel:color-mix(in oklch, oklch(0.05 0.02 25), oklch(0.95 0.01 25) 16%);
+    --track:color-mix(in oklch, oklch(0.05 0.02 25), oklch(0.95 0.01 25) 10%); --track-2:color-mix(in oklch, oklch(0.05 0.02 25), oklch(0.95 0.01 25) 14%);
+    --muted:oklch(0.7 0.1 25); --faint:color-mix(in oklch, oklch(0.7 0.1 25) 55%, oklch(0.05 0.02 25)); --line:oklch(0.2 0.08 25); --rail:color-mix(in oklch, oklch(0.95 0.01 25) 14%, transparent);
+    --primary:oklch(0.75 0.3 25); --primary-fg:oklch(0.05 0.02 25); --ring:oklch(0.55 0.25 25); --hot:oklch(0.8 0.35 20); }
+  :root[data-theme="soft-pop"] { --bg:oklch(0 0 0); --fg:oklch(1 0 0); --panel:color-mix(in oklch, oklch(0.2455 0.0217 257.2823), oklch(1 0 0) 6%); --head:color-mix(in oklch, oklch(0.2455 0.0217 257.2823), oklch(1 0 0) 11%);
+    --row:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 3%); --hover:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 8%); --sel:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 16%);
+    --track:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 10%); --track-2:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 14%);
+    --muted:oklch(0.8452 0 0); --faint:color-mix(in oklch, oklch(0.8452 0 0) 55%, oklch(0 0 0)); --line:oklch(0.4459 0 0); --rail:color-mix(in oklch, oklch(1 0 0) 14%, transparent);
+    --primary:oklch(0.6801 0.1583 276.9349); --primary-fg:oklch(0 0 0); --ring:oklch(0.6801 0.1583 276.9349); --hot:oklch(0.7106 0.1661 22.2162); }
+  :root[data-theme="vhs"] { --bg:oklch(0.166 0.0254 298.9423); --fg:oklch(0.9024 0.0604 306.703); --panel:color-mix(in oklch, oklch(0.1962 0.0365 301.0125), oklch(0.9024 0.0604 306.703) 6%); --head:color-mix(in oklch, oklch(0.1962 0.0365 301.0125), oklch(0.9024 0.0604 306.703) 11%);
+    --row:color-mix(in oklch, oklch(0.166 0.0254 298.9423), oklch(0.9024 0.0604 306.703) 3%); --hover:color-mix(in oklch, oklch(0.166 0.0254 298.9423), oklch(0.9024 0.0604 306.703) 8%); --sel:color-mix(in oklch, oklch(0.166 0.0254 298.9423), oklch(0.9024 0.0604 306.703) 16%);
+    --track:color-mix(in oklch, oklch(0.166 0.0254 298.9423), oklch(0.9024 0.0604 306.703) 10%); --track-2:color-mix(in oklch, oklch(0.166 0.0254 298.9423), oklch(0.9024 0.0604 306.703) 14%);
+    --muted:oklch(0.7161 0.0091 56.259); --faint:color-mix(in oklch, oklch(0.7161 0.0091 56.259) 55%, oklch(0.166 0.0254 298.9423)); --line:oklch(0.2905 0.1432 302.7167); --rail:color-mix(in oklch, oklch(0.9024 0.0604 306.703) 14%, transparent);
+    --primary:oklch(0.6668 0.2591 322.1499); --primary-fg:oklch(0.2795 0.0368 260.031); --ring:oklch(0.6847 0.1479 237.3225); --hot:oklch(0.5246 0.199 3.9582); }
+  :root[data-theme="pacman"] { --bg:oklch(0 0 0); --fg:oklch(1 0 0); --panel:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 6%); --head:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 11%);
+    --row:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 3%); --hover:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 8%); --sel:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 16%);
+    --track:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 10%); --track-2:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 14%);
+    --muted:oklch(0.7155 0 0); --faint:color-mix(in oklch, oklch(0.7155 0 0) 55%, oklch(0 0 0)); --line:oklch(0.4882 0.2172 264.3763); --rail:color-mix(in oklch, oklch(1 0 0) 14%, transparent);
+    --primary:oklch(0.9451 0.1243 101.5399); --primary-fg:oklch(0.2857 0.0639 53.8133); --ring:oklch(0.7137 0.1434 254.624); --hot:oklch(0.5143 0.1978 16.935); }
+  :root[data-theme="rusty-byte"] { --bg:oklch(0.15 0.05 40); --fg:oklch(0.95 0.02 95); --panel:color-mix(in oklch, oklch(0.18 0.05 40), oklch(0.95 0.02 95) 6%); --head:color-mix(in oklch, oklch(0.18 0.05 40), oklch(0.95 0.02 95) 11%);
+    --row:color-mix(in oklch, oklch(0.15 0.05 40), oklch(0.95 0.02 95) 3%); --hover:color-mix(in oklch, oklch(0.15 0.05 40), oklch(0.95 0.02 95) 8%); --sel:color-mix(in oklch, oklch(0.15 0.05 40), oklch(0.95 0.02 95) 16%);
+    --track:color-mix(in oklch, oklch(0.15 0.05 40), oklch(0.95 0.02 95) 10%); --track-2:color-mix(in oklch, oklch(0.15 0.05 40), oklch(0.95 0.02 95) 14%);
+    --muted:oklch(0.8 0.05 80); --faint:color-mix(in oklch, oklch(0.8 0.05 80) 55%, oklch(0.15 0.05 40)); --line:oklch(0.25 0.05 40); --rail:color-mix(in oklch, oklch(0.95 0.02 95) 14%, transparent);
+    --primary:oklch(0.7 0.2 40); --primary-fg:oklch(0.1 0.02 40); --ring:oklch(0.5 0.2 40); --hot:oklch(0.55 0.25 20); }
+  :root[data-theme="zelda"] { --bg:oklch(0.15 0.05 120); --fg:oklch(0.95 0.02 95); --panel:color-mix(in oklch, oklch(0.12 0.02 20), oklch(0.95 0.02 95) 6%); --head:color-mix(in oklch, oklch(0.12 0.02 20), oklch(0.95 0.02 95) 11%);
+    --row:color-mix(in oklch, oklch(0.15 0.05 120), oklch(0.95 0.02 95) 3%); --hover:color-mix(in oklch, oklch(0.15 0.05 120), oklch(0.95 0.02 95) 8%); --sel:color-mix(in oklch, oklch(0.15 0.05 120), oklch(0.95 0.02 95) 16%);
+    --track:color-mix(in oklch, oklch(0.15 0.05 120), oklch(0.95 0.02 95) 10%); --track-2:color-mix(in oklch, oklch(0.15 0.05 120), oklch(0.95 0.02 95) 14%);
+    --muted:oklch(0.8 0.02 95); --faint:color-mix(in oklch, oklch(0.8 0.02 95) 55%, oklch(0.15 0.05 120)); --line:oklch(0.25 0.02 90); --rail:color-mix(in oklch, oklch(0.95 0.02 95) 14%, transparent);
+    --primary:oklch(0.85 0.2 90); --primary-fg:oklch(0.05 0.02 10); --ring:oklch(0.35 0.1 120); --hot:oklch(0.55 0.25 30); }
+  :root[data-theme="dungeon-torch"] { --bg:oklch(0.15 0.02 40); --fg:oklch(0.92 0.03 55); --panel:color-mix(in oklch, oklch(0.18 0.02 42), oklch(0.92 0.03 55) 6%); --head:color-mix(in oklch, oklch(0.18 0.02 42), oklch(0.92 0.03 55) 11%);
+    --row:color-mix(in oklch, oklch(0.15 0.02 40), oklch(0.92 0.03 55) 3%); --hover:color-mix(in oklch, oklch(0.15 0.02 40), oklch(0.92 0.03 55) 8%); --sel:color-mix(in oklch, oklch(0.15 0.02 40), oklch(0.92 0.03 55) 16%);
+    --track:color-mix(in oklch, oklch(0.15 0.02 40), oklch(0.92 0.03 55) 10%); --track-2:color-mix(in oklch, oklch(0.15 0.02 40), oklch(0.92 0.03 55) 14%);
+    --muted:oklch(0.6 0.04 50); --faint:color-mix(in oklch, oklch(0.6 0.04 50) 55%, oklch(0.15 0.02 40)); --line:oklch(0.3 0.03 45); --rail:color-mix(in oklch, oklch(0.92 0.03 55) 14%, transparent);
+    --primary:oklch(0.7 0.15 55); --primary-fg:oklch(0.12 0.01 40); --ring:oklch(0.7 0.15 55); --hot:oklch(0.55 0.2 25); }
+  :root[data-theme="space-station"] { --bg:oklch(0.13 0.02 240); --fg:oklch(0.9 0.02 220); --panel:color-mix(in oklch, oklch(0.16 0.02 238), oklch(0.9 0.02 220) 6%); --head:color-mix(in oklch, oklch(0.16 0.02 238), oklch(0.9 0.02 220) 11%);
+    --row:color-mix(in oklch, oklch(0.13 0.02 240), oklch(0.9 0.02 220) 3%); --hover:color-mix(in oklch, oklch(0.13 0.02 240), oklch(0.9 0.02 220) 8%); --sel:color-mix(in oklch, oklch(0.13 0.02 240), oklch(0.9 0.02 220) 16%);
+    --track:color-mix(in oklch, oklch(0.13 0.02 240), oklch(0.9 0.02 220) 10%); --track-2:color-mix(in oklch, oklch(0.13 0.02 240), oklch(0.9 0.02 220) 14%);
+    --muted:oklch(0.58 0.03 230); --faint:color-mix(in oklch, oklch(0.58 0.03 230) 55%, oklch(0.13 0.02 240)); --line:oklch(0.28 0.03 235); --rail:color-mix(in oklch, oklch(0.9 0.02 220) 14%, transparent);
+    --primary:oklch(0.65 0.15 220); --primary-fg:oklch(0.1 0.01 240); --ring:oklch(0.65 0.15 220); --hot:oklch(0.55 0.2 25); }
+  :root[data-theme="pixel-forest"] { --bg:oklch(0.14 0.03 140); --fg:oklch(0.88 0.03 138); --panel:color-mix(in oklch, oklch(0.17 0.03 142), oklch(0.88 0.03 138) 6%); --head:color-mix(in oklch, oklch(0.17 0.03 142), oklch(0.88 0.03 138) 11%);
+    --row:color-mix(in oklch, oklch(0.14 0.03 140), oklch(0.88 0.03 138) 3%); --hover:color-mix(in oklch, oklch(0.14 0.03 140), oklch(0.88 0.03 138) 8%); --sel:color-mix(in oklch, oklch(0.14 0.03 140), oklch(0.88 0.03 138) 16%);
+    --track:color-mix(in oklch, oklch(0.14 0.03 140), oklch(0.88 0.03 138) 10%); --track-2:color-mix(in oklch, oklch(0.14 0.03 140), oklch(0.88 0.03 138) 14%);
+    --muted:oklch(0.55 0.04 140); --faint:color-mix(in oklch, oklch(0.55 0.04 140) 55%, oklch(0.14 0.03 140)); --line:oklch(0.28 0.04 140); --rail:color-mix(in oklch, oklch(0.88 0.03 138) 14%, transparent);
+    --primary:oklch(0.6 0.15 145); --primary-fg:oklch(0.12 0.02 140); --ring:oklch(0.6 0.15 145); --hot:oklch(0.55 0.2 25); }
+  :root[data-theme="ice-cavern"] { --bg:oklch(0.12 0.02 250); --fg:oklch(0.9 0.02 235); --panel:color-mix(in oklch, oklch(0.15 0.02 248), oklch(0.9 0.02 235) 6%); --head:color-mix(in oklch, oklch(0.15 0.02 248), oklch(0.9 0.02 235) 11%);
+    --row:color-mix(in oklch, oklch(0.12 0.02 250), oklch(0.9 0.02 235) 3%); --hover:color-mix(in oklch, oklch(0.12 0.02 250), oklch(0.9 0.02 235) 8%); --sel:color-mix(in oklch, oklch(0.12 0.02 250), oklch(0.9 0.02 235) 16%);
+    --track:color-mix(in oklch, oklch(0.12 0.02 250), oklch(0.9 0.02 235) 10%); --track-2:color-mix(in oklch, oklch(0.12 0.02 250), oklch(0.9 0.02 235) 14%);
+    --muted:oklch(0.55 0.03 240); --faint:color-mix(in oklch, oklch(0.55 0.03 240) 55%, oklch(0.12 0.02 250)); --line:oklch(0.25 0.03 248); --rail:color-mix(in oklch, oklch(0.9 0.02 235) 14%, transparent);
+    --primary:oklch(0.65 0.12 230); --primary-fg:oklch(0.1 0.01 250); --ring:oklch(0.65 0.12 230); --hot:oklch(0.55 0.2 25); }
+  :root[data-theme="lava-core"] { --bg:oklch(0.1 0.02 25); --fg:oklch(0.9 0.03 35); --panel:color-mix(in oklch, oklch(0.13 0.02 27), oklch(0.9 0.03 35) 6%); --head:color-mix(in oklch, oklch(0.13 0.02 27), oklch(0.9 0.03 35) 11%);
+    --row:color-mix(in oklch, oklch(0.1 0.02 25), oklch(0.9 0.03 35) 3%); --hover:color-mix(in oklch, oklch(0.1 0.02 25), oklch(0.9 0.03 35) 8%); --sel:color-mix(in oklch, oklch(0.1 0.02 25), oklch(0.9 0.03 35) 16%);
+    --track:color-mix(in oklch, oklch(0.1 0.02 25), oklch(0.9 0.03 35) 10%); --track-2:color-mix(in oklch, oklch(0.1 0.02 25), oklch(0.9 0.03 35) 14%);
+    --muted:oklch(0.55 0.04 30); --faint:color-mix(in oklch, oklch(0.55 0.04 30) 55%, oklch(0.1 0.02 25)); --line:oklch(0.25 0.03 28); --rail:color-mix(in oklch, oklch(0.9 0.03 35) 14%, transparent);
+    --primary:oklch(0.65 0.2 30); --primary-fg:oklch(0.08 0.01 25); --ring:oklch(0.65 0.2 30); --hot:oklch(0.55 0.22 25); }
+  :root[data-theme="glitch-mode"] { --bg:oklch(0.05 0 0); --fg:oklch(0.9 0.02 195); --panel:color-mix(in oklch, oklch(0.08 0 0), oklch(0.9 0.02 195) 6%); --head:color-mix(in oklch, oklch(0.08 0 0), oklch(0.9 0.02 195) 11%);
+    --row:color-mix(in oklch, oklch(0.05 0 0), oklch(0.9 0.02 195) 3%); --hover:color-mix(in oklch, oklch(0.05 0 0), oklch(0.9 0.02 195) 8%); --sel:color-mix(in oklch, oklch(0.05 0 0), oklch(0.9 0.02 195) 16%);
+    --track:color-mix(in oklch, oklch(0.05 0 0), oklch(0.9 0.02 195) 10%); --track-2:color-mix(in oklch, oklch(0.05 0 0), oklch(0.9 0.02 195) 14%);
+    --muted:oklch(0.55 0.03 195); --faint:color-mix(in oklch, oklch(0.55 0.03 195) 55%, oklch(0.05 0 0)); --line:oklch(0.2 0.02 195); --rail:color-mix(in oklch, oklch(0.9 0.02 195) 14%, transparent);
+    --primary:oklch(0.7 0.2 195); --primary-fg:oklch(0.05 0 0); --ring:oklch(0.7 0.2 195); --hot:oklch(0.55 0.2 25); }
+  :root[data-theme="dwarven-vault"] { --bg:oklch(0.14 0.01 70); --fg:oklch(0.88 0.03 80); --panel:color-mix(in oklch, oklch(0.17 0.015 72), oklch(0.88 0.03 80) 6%); --head:color-mix(in oklch, oklch(0.17 0.015 72), oklch(0.88 0.03 80) 11%);
+    --row:color-mix(in oklch, oklch(0.14 0.01 70), oklch(0.88 0.03 80) 3%); --hover:color-mix(in oklch, oklch(0.14 0.01 70), oklch(0.88 0.03 80) 8%); --sel:color-mix(in oklch, oklch(0.14 0.01 70), oklch(0.88 0.03 80) 16%);
+    --track:color-mix(in oklch, oklch(0.14 0.01 70), oklch(0.88 0.03 80) 10%); --track-2:color-mix(in oklch, oklch(0.14 0.01 70), oklch(0.88 0.03 80) 14%);
+    --muted:oklch(0.55 0.03 78); --faint:color-mix(in oklch, oklch(0.55 0.03 78) 55%, oklch(0.14 0.01 70)); --line:oklch(0.28 0.02 72); --rail:color-mix(in oklch, oklch(0.88 0.03 80) 14%, transparent);
+    --primary:oklch(0.7 0.12 80); --primary-fg:oklch(0.12 0.01 70); --ring:oklch(0.7 0.12 80); --hot:oklch(0.55 0.2 25); }
+  :root[data-theme="dragon-hoard"] { --bg:oklch(0.08 0.01 30); --fg:oklch(0.88 0.04 50); --panel:color-mix(in oklch, oklch(0.11 0.015 32), oklch(0.88 0.04 50) 6%); --head:color-mix(in oklch, oklch(0.11 0.015 32), oklch(0.88 0.04 50) 11%);
+    --row:color-mix(in oklch, oklch(0.08 0.01 30), oklch(0.88 0.04 50) 3%); --hover:color-mix(in oklch, oklch(0.08 0.01 30), oklch(0.88 0.04 50) 8%); --sel:color-mix(in oklch, oklch(0.08 0.01 30), oklch(0.88 0.04 50) 16%);
+    --track:color-mix(in oklch, oklch(0.08 0.01 30), oklch(0.88 0.04 50) 10%); --track-2:color-mix(in oklch, oklch(0.08 0.01 30), oklch(0.88 0.04 50) 14%);
+    --muted:oklch(0.55 0.04 45); --faint:color-mix(in oklch, oklch(0.55 0.04 45) 55%, oklch(0.08 0.01 30)); --line:oklch(0.22 0.02 35); --rail:color-mix(in oklch, oklch(0.88 0.04 50) 14%, transparent);
+    --primary:oklch(0.6 0.2 20); --primary-fg:oklch(0.08 0.01 30); --ring:oklch(0.6 0.2 20); --hot:oklch(0.55 0.2 25); }
+  :root[data-theme="ancient-runes"] { --bg:oklch(0.14 0.02 185); --fg:oklch(0.88 0.02 190); --panel:color-mix(in oklch, oklch(0.17 0.02 187), oklch(0.88 0.02 190) 6%); --head:color-mix(in oklch, oklch(0.17 0.02 187), oklch(0.88 0.02 190) 11%);
+    --row:color-mix(in oklch, oklch(0.14 0.02 185), oklch(0.88 0.02 190) 3%); --hover:color-mix(in oklch, oklch(0.14 0.02 185), oklch(0.88 0.02 190) 8%); --sel:color-mix(in oklch, oklch(0.14 0.02 185), oklch(0.88 0.02 190) 16%);
+    --track:color-mix(in oklch, oklch(0.14 0.02 185), oklch(0.88 0.02 190) 10%); --track-2:color-mix(in oklch, oklch(0.14 0.02 185), oklch(0.88 0.02 190) 14%);
+    --muted:oklch(0.55 0.03 188); --faint:color-mix(in oklch, oklch(0.55 0.03 188) 55%, oklch(0.14 0.02 185)); --line:oklch(0.28 0.02 187); --rail:color-mix(in oklch, oklch(0.88 0.02 190) 14%, transparent);
+    --primary:oklch(0.6 0.12 185); --primary-fg:oklch(0.12 0.01 185); --ring:oklch(0.6 0.12 185); --hot:oklch(0.55 0.2 25); }
   * { box-sizing:border-box }
   [hidden] { display:none !important }
   html { background:var(--bg); }
@@ -44,6 +147,7 @@
   .status { display:flex; gap:10px; flex-wrap:wrap; color:var(--muted); font:8px/1.8 var(--pixel); letter-spacing:.5px; }
   .status .sep { color:var(--faint); }
   .dot { display:inline-block; width:6px; height:6px; background:#4ade80; margin-right:6px; vertical-align:0; }
+  .theme-pick { display:flex; align-items:center; gap:8px; color:var(--muted); font:8px/1.4 var(--pixel); letter-spacing:.5px; }
   .auth { margin-left:auto; display:flex; align-items:center; gap:14px; font-size:12px; }
   .btn { --px-c:var(--primary); background:var(--primary); color:var(--primary-fg); border:0; border-radius:0; padding:7px 14px; margin:4px; font:9px/1.4 var(--pixel); letter-spacing:.5px; transition:transform .08s; box-shadow:var(--px-frame); }
   .btn:hover:not(:disabled) { --px-c:#ffffff; background:#ffffff; }
@@ -64,7 +168,7 @@
   .tabs { --px-c:var(--ring); display:inline-flex; flex-wrap:wrap; gap:2px; padding:3px; margin:4px; background:var(--bg); box-shadow:var(--px-frame); }
   .tabs button { background:none; border:0; border-radius:0; color:var(--muted); padding:7px 12px; font:8.5px/1.4 var(--pixel); letter-spacing:.5px; }
   .tabs button:hover { color:var(--fg); }
-  .tabs button.on { background:#262626; color:var(--fg); cursor:default; }
+  .tabs button.on { background:var(--sel); color:var(--fg); cursor:default; }
   .board-bar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
   .filters { display:flex; flex-wrap:wrap; gap:14px; margin-left:auto; }
   .filters label { display:flex; align-items:center; gap:8px; white-space:nowrap; color:var(--muted); font:8px/1.4 var(--pixel); letter-spacing:.5px; }
@@ -94,9 +198,9 @@
   /* Profile form */
   .profile form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)) auto; gap:16px; align-items:end; }
   label { display:grid; gap:8px; color:var(--muted); font:8px/1.4 var(--pixel); letter-spacing:.5px; }
-  input { min-width:0; padding:8px 10px; margin:3px; background:#1a1a1a; border:0; border-radius:0; font:11px/1.4 var(--pixel); letter-spacing:.5px;
+  input { min-width:0; padding:8px 10px; margin:3px; background:var(--track); border:0; border-radius:0; font:11px/1.4 var(--pixel); letter-spacing:.5px;
     box-shadow:0 -3px 0 0 var(--ring), 0 3px 0 0 var(--ring), -3px 0 0 0 var(--ring), 3px 0 0 0 var(--ring); }
-  input:focus { outline:none; background:#222; }
+  input:focus { outline:none; background:var(--track-2); }
   .profile-link { font:12px/1.4 var(--text); letter-spacing:0; }
   .message { min-height:1.5em; margin:12px 0 0; color:var(--muted); font-size:12px; }
 
@@ -128,7 +232,7 @@
   .loading { display:flex; align-items:center; justify-content:center; gap:10px; color:var(--faint); font:8px/1.6 var(--pixel); padding:18px; }
 
   /* Segmented XP / progress bar */
-  .xp { --c:var(--primary); position:relative; height:14px; margin:3px; background:#1a1a1a; flex:1; min-width:60px;
+  .xp { --c:var(--primary); position:relative; height:14px; margin:3px; background:var(--track); flex:1; min-width:60px;
     box-shadow:0 -3px 0 0 var(--line), 0 3px 0 0 var(--line), -3px 0 0 0 var(--line), 3px 0 0 0 var(--line); }
   .xp i { position:absolute; inset:2px auto 2px 2px; width:calc((100% - 4px) * var(--p, 0)); background:repeating-linear-gradient(90deg, var(--c) 0 6px, transparent 6px 8px); transition:width .4s steps(8); }
   .xp-sm { height:10px; min-width:70px; max-width:90px; }
@@ -174,8 +278,8 @@
   .ring { position:relative; display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:end; gap:18px; margin:22px 4px 0; padding:18px 20px 0; overflow:hidden; }
   .ring .spark { position:absolute; width:4px; height:4px; background:var(--gold); animation:blink 1.2s steps(2) infinite; }
   .ring .spark:nth-child(3n) { background:#fff; width:2px; height:2px; }
-  .floor { grid-column:1 / -1; height:30px; margin:0 -20px; border-top:4px solid #2a2a2a;
-    background:repeating-linear-gradient(90deg, #1b1b1b 0 16px, #121212 16px 32px); }
+  .floor { grid-column:1 / -1; height:30px; margin:0 -20px; border-top:4px solid var(--line);
+    background:repeating-linear-gradient(90deg, var(--track) 0 16px, var(--row) 16px 32px); }
   .fighter { --c:var(--fg); min-width:0; display:grid; gap:7px; position:relative; z-index:1; }
   .fighter.right { text-align:right; }
   .f-name { font:12px/1.4 var(--pixel); color:var(--c); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -208,7 +312,7 @@
   .tug-row .v { color:var(--muted); } .tug-row .v:last-child { text-align:right; }
   .tug-row .v.won { color:var(--gold); } .tug-row .v svg { vertical-align:-1px; margin:0 6px; }
   .tug-row .lab { text-align:center; color:var(--faint); font-size:7px; }
-  .tug-bar { position:relative; height:12px; background:#1a1a1a; }
+  .tug-bar { position:relative; height:12px; background:var(--track); }
   .tug-bar i { position:absolute; top:2px; bottom:2px; width:calc((100% - 4px) * var(--p, 0)); background:repeating-linear-gradient(90deg, var(--c) 0 6px, transparent 6px 8px); transition:width .4s steps(8); }
   .tug-bar.l i { right:2px; } .tug-bar.r i { left:2px; }
   .dialog { display:grid; gap:14px; margin:26px 4px 0; }
@@ -239,7 +343,7 @@
   .cal-grid { display:grid; grid-template-columns:repeat(7, 1fr); gap:2px; text-align:center; }
   .cal-grid .dow { color:var(--faint); font:7px/2.4 var(--pixel); }
   .cal-cell { position:relative; aspect-ratio:1.15; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; background:none; border:0; padding:0; color:var(--fg); font:9px/1 var(--pixel); }
-  .cal-cell.out { color:#3d3d3d; }
+  .cal-cell.out { color:var(--faint); opacity:.5; }
   .cal-cell.today { background:var(--primary); color:var(--primary-fg); }
   .cal-cell.has { cursor:pointer; } .cal-cell.has:hover { background:var(--head); } .cal-cell.today.has:hover { background:#fff; }
   .cal-cell.sel { outline:2px solid var(--ring); outline-offset:-2px; }
@@ -298,6 +402,7 @@
     <span>Next sync</span><div class="xp xp-sm" id="sync-bar"><i></i></div><span id="sync-left">–</span>
   </div>
   <div class="auth" aria-label="Account">
+    <label class="theme-pick">Theme<select id="theme" aria-label="Theme"></select></label>
     <span class="muted" id="auth-status" aria-live="polite"></span>
     <button class="btn" id="login" disabled>Sign in</button>
     <button class="btn" id="logout" hidden>Log out</button>
@@ -383,7 +488,7 @@
 </main>
 <footer class="statusbar">
   <span>Scoring: CF rating/100 · LC 5/10/20</span>
-  <span>Keys: <kbd>w</kbd> <kbd>b</kbd> <kbd>m</kbd> <kbd>a</kbd> period · <kbd>s</kbd> <kbd>p</kbd> chart · <kbd>d</kbd> duel</span>
+  <span>Keys: <kbd>w</kbd> <kbd>b</kbd> <kbd>m</kbd> <kbd>a</kbd> period · <kbd>s</kbd> <kbd>p</kbd> chart · <kbd>d</kbd> duel · <kbd>t</kbd> theme</span>
   <span><a href="https://github.com/ChandanYdv0402/cp-leaderboard" target="_blank" rel="noopener noreferrer">Source ↗</a></span>
 </footer>
 <dialog class="signin" id="signin-dialog" aria-labelledby="signin-title">
@@ -888,22 +993,32 @@ function renderBoard() {
 // Horizontal bars of the same rows as the table: CF/LC stacked for score and solved, side by side for rating.
 // Chart colors and font come from the CSS tokens in :root.
 const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-const CHART_COLORS = { cf: cssVar("--cf"), lc: cssVar("--lc"), all: cssVar("--all") };
+// Theme colors can be oklch()/color-mix(), which Chart.js can't parse: paint one pixel and read it back as rgba().
+const colorProbe = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+function cssColor(name) {
+  const raw = cssVar(name);
+  colorProbe.clearRect(0, 0, 1, 1);
+  colorProbe.fillStyle = "#000"; colorProbe.fillStyle = raw;
+  colorProbe.fillRect(0, 0, 1, 1);
+  const [r, g, b, a] = colorProbe.getImageData(0, 0, 1, 1).data;
+  return `rgba(${r},${g},${b},${(a / 255).toFixed(3)})`;
+}
+const CHART_COLORS = { cf: cssColor("--cf"), lc: cssColor("--lc"), all: cssColor("--all") };
 function chartTheme() {
   // Pixel font axes, square marks and a flat bordered tooltip, like the 8-bit Chart component.
   window.Chart.defaults.font.family = cssVar("--pixel");
   window.Chart.defaults.font.size = 7;
   Object.assign(window.Chart.defaults.plugins.tooltip, {
-    backgroundColor: "#121212", borderColor: cssVar("--ring"), borderWidth: 2, cornerRadius: 0, padding: 10,
+    backgroundColor: cssColor("--panel"), titleColor: cssColor("--fg"), bodyColor: cssColor("--fg"), footerColor: cssColor("--fg"), borderColor: cssColor("--ring"), borderWidth: 2, cornerRadius: 0, padding: 10,
     boxPadding: 4, usePointStyle: true, titleFont: { size: 8 }, bodyFont: { size: 8 }, footerFont: { size: 8 },
   });
-  return { grid: { color: "#1f1f1f" }, ticks: { color: cssVar("--muted") }, border: { color: cssVar("--line"), dash: [2, 4] } };
+  return { grid: { color: cssColor("--track") }, ticks: { color: cssColor("--muted") }, border: { color: cssColor("--line"), dash: [2, 4] } };
 }
 // Bars drawn like XP bars: 2px gaps every 8px, a lit top edge and a shaded bottom edge.
 const pixelBars = {
   id: "pixelBars",
   afterDatasetsDraw(chart) {
-    const { ctx } = chart, bg = cssVar("--bg");
+    const { ctx } = chart, bg = cssColor("--bg");
     ctx.save();
     chart.data.datasets.forEach((_, i) => {
       const meta = chart.getDatasetMeta(i);
@@ -966,10 +1081,10 @@ function renderChart(rows, platform, sort) {
       interaction: { mode: "index", axis: "y", intersect: false },
       scales: {
         x: { ...axis, stacked, beginAtZero: true },
-        y: { ...axis, stacked, grid: { display: false }, ticks: { color: cssVar("--fg"), padding: 46 } },
+        y: { ...axis, stacked, grid: { display: false }, ticks: { color: cssColor("--fg"), padding: 46 } },
       },
       plugins: {
-        legend: { display: datasets.length > 1, labels: { color: cssVar("--muted"), usePointStyle: true, pointStyle: "rect", boxWidth: 8, boxHeight: 8 } },
+        legend: { display: datasets.length > 1, labels: { color: cssColor("--muted"), usePointStyle: true, pointStyle: "rect", boxWidth: 8, boxHeight: 8 } },
         tooltip: { callbacks: { footer: items => stacked && items.length > 1 ? `Total: ${items.reduce((n, i) => n + i.parsed.x, 0)}` : "" } },
       },
     },
@@ -1070,10 +1185,10 @@ async function renderProgress(platform, sort, token) {
               ? new Date(v).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
               : new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" });
           } } },
-        y: { ...axis, beginAtZero: sort !== "rating", title: { display: true, text: label, color: cssVar("--faint") } },
+        y: { ...axis, beginAtZero: sort !== "rating", title: { display: true, text: label, color: cssColor("--faint") } },
       },
       plugins: {
-        legend: { labels: { color: cssVar("--muted"), usePointStyle: true, pointStyle: "rect", boxWidth: 8, boxHeight: 8 } },
+        legend: { labels: { color: cssColor("--muted"), usePointStyle: true, pointStyle: "rect", boxWidth: 8, boxHeight: 8 } },
         tooltip: { callbacks: { title: items => new Date(items[0].parsed.x).toLocaleString() } },
       },
     },
@@ -1094,8 +1209,25 @@ document.addEventListener("keydown", event => {
   if (period) [...$("tabs").children].find(b => b.dataset.k === period)?.click();
   if (view) [...$("chart-view").children].find(b => b.dataset.v === view)?.click();
   if (event.key === "d" && !$("arena").hidden) $("arena").scrollIntoView({ behavior: "smooth" });
+  if (event.key === "t") applyTheme(THEMES[(THEMES.findIndex(([v]) => v === $("theme").value) + 1) % THEMES.length][0]);
 });
 $("platform").addEventListener("change", renderBoard);
+
+// ---------- Themes (8bitcn/ui palettes; CSS blocks keyed by data-theme on <html>) ----------
+const THEMES = [["default", "Default"], ["sega", "Sega"], ["gameboy", "Gameboy"], ["atari", "Atari"], ["nintendo", "Nintendo"], ["arcade", "Arcade"],
+  ["neo-geo", "Neo Geo"], ["soft-pop", "Soft Pop"], ["vhs", "VHS"], ["pacman", "Pacman"], ["rusty-byte", "Rusty Byte"], ["zelda", "Zelda"],
+  ["dungeon-torch", "Dungeon Torch"], ["space-station", "Space Station"], ["pixel-forest", "Pixel Forest"], ["ice-cavern", "Ice Cavern"],
+  ["lava-core", "Lava Core"], ["glitch-mode", "Glitch Mode"], ["dwarven-vault", "Dwarven Vault"], ["dragon-hoard", "Dragon Hoard"], ["ancient-runes", "Ancient Runes"]];
+function applyTheme(theme) {
+  if (theme === "default") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+  $("theme").value = theme;
+  try { localStorage.setItem("cp-theme", theme); } catch {}
+  if (boardRows.length) renderBoard(); // charts read the new colors at render time
+}
+$("theme").innerHTML = THEMES.map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
+$("theme").value = document.documentElement.dataset.theme || "default";
+$("theme").addEventListener("change", event => applyTheme(event.target.value));
 $("sort").addEventListener("change", renderBoard);
 
 // ---------- Duel arena + head-on alert ----------
@@ -1236,10 +1368,10 @@ async function renderDuelChart(a, b, token) {
       scales: {
         x: { ...axis, type: "linear", ticks: { ...axis.ticks, maxTicksLimit: 6,
           callback(v) { return this.max - this.min < 2 * 864e5 ? new Date(v).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" }); } } },
-        y: { ...axis, beginAtZero: true, title: { display: true, text: "Points gained", color: cssVar("--faint") } },
+        y: { ...axis, beginAtZero: true, title: { display: true, text: "Points gained", color: cssColor("--faint") } },
       },
       plugins: {
-        legend: { labels: { color: cssVar("--muted"), usePointStyle: true, pointStyle: "rect", boxWidth: 8, boxHeight: 8 } },
+        legend: { labels: { color: cssColor("--muted"), usePointStyle: true, pointStyle: "rect", boxWidth: 8, boxHeight: 8 } },
         tooltip: { callbacks: { title: items => new Date(items[0].parsed.x).toLocaleString() } },
       },
     },
