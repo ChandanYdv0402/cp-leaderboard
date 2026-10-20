@@ -1,12 +1,19 @@
-[package]
-name = "cp-leaderboard"
-version = "0.1.0"
-edition = "2021"
+# Cargo.toml is the Rust project file (like package.json for Node).
+# `cargo build` compiles, `cargo run` compiles and runs, `cargo check` only type-checks (fastest).
 
+[package]
+name = "cp-leaderboard"   # also the name of the compiled program
+version = "0.1.0"
+edition = "2021"          # which Rust language edition (set of syntax rules) to use
+
+# Libraries ("crates") this program uses, downloaded from crates.io.
+# "1" means "any 1.x version"; Cargo.lock pins the exact versions actually used.
 [dependencies]
-anyhow = "1"
-chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1"              # simple error type + `?`, `.context()`, `bail!`
+chrono = { version = "0.4", features = ["serde"] }   # dates/times; "serde" feature lets them go to/from JSON
+# HTTP client. "blocking" = simple wait-for-the-answer requests; "json" = .json() helpers;
+# "rustls-tls" = HTTPS without needing OpenSSL installed.
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-toml = "0.8"
+serde = { version = "1", features = ["derive"] }     # #[derive(Serialize, Deserialize)]
+serde_json = "1"          # JSON parsing/printing and the json! macro
+toml = "0.8"              # TOML parsing (left over from the users.toml version; currently unused)
