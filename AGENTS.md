@@ -43,6 +43,8 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 
 - Registration is closed: `REGISTRATION_OPEN = false` in `site/index.html` makes the email flow reject unknown emails ("Registration is closed") instead of signing them up, and the dialog says so. `supabase/close_registration.sql` (run manually in the SQL Editor) limits the profile insert policy to already-existing profiles, so new Clerk users can't join even via Google/GitHub; it keeps the policy because the site's upsert checks INSERT policies. Clerk's own sign-up must also be set to Restricted in the dashboard. The file includes reopen steps.
 
+- Layout now mirrors 8bitcn: symmetric header (brand | status + next sync centered | theme + account) and footer, and a 1:2:1 grid — left: Next contest, Contest calendar, Upcoming contests (two-column list); center: Leaderboard, Ranks; right: Rank legend (its own panel now), Solve heatmap (18 weeks to fit). Two columns below 1280px (center spans the top), one below 760px. Type scaled up again (~1.3x small pixel text; hero and chart fonts too) with roomier panel padding; phones get compact table headers. Verified at 1920, 1280 and 375 widths with no horizontal scroll or console errors.
+
 ## Current Blockers / Unverified
 
 - Supabase Auth (Google OAuth / email OTP) is no longer used by the site; login providers are now configured in Clerk. Clerk sign-in, token acceptance by Supabase, and RLS writes with Clerk ids are untested.
