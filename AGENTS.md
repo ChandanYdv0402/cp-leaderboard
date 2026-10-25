@@ -8,6 +8,9 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 
 ## Current Progress
 
+- Added invitation-only groups: group dashboards, remembered per-user dashboard selection, a separate global rankings option, create/join forms, owner invitations with rotation, member removal, leaving, and deletion. Existing users' profile editing is collapsed so dashboards are prominent; new profiles open for setup.
+- Added group/member/invitation tables, RLS, and checked RPCs to `supabase/schema.sql` and the matching existing-project migration `supabase/migrations/202610250001_groups.sql`. Group standings reuse global scoring and include members awaiting snapshots; the Rust collector is unchanged. Invitation drafts persist in the same browser across sign-in tabs and can be dismissed.
+- Added Node-based PostgreSQL/RLS and browser regression checks (`npm ci && npm test`); PGlite is a development dependency only. PostgreSQL access tests and real Edge dashboard/mobile checks passed locally using the Node runtime bundled with VS Code. Hosted migration and real signed-in group flows remain unverified.
 - Added `supabase/schema.sql` with `profiles`, `accounts`, `snapshots`, and `contests`, RLS policies, grants, and the `leaderboard(days)` RPC.
 - Reworked `src/main.rs` to fetch profiles/accounts from Supabase REST, fetch platform stats using the existing `src/platforms.rs`, preserve stats when an active platform fetch fails, clear stats for unlinked platforms, mark successful handles verified, and write snapshots/contests.
 - Updated `site/index.html` with Supabase OAuth/email sign-in, profile and handle editing, leaderboard RPC queries, and upcoming contest queries.
@@ -30,6 +33,7 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 
 ## Current Blockers / Unverified
 
+- The groups migration has not been applied to the hosted Supabase project, and these changes have not been deployed. Apply `supabase/migrations/202610250001_groups.sql` once before deploying this UI; fresh projects use the complete schema instead. Browser QA used mocked Supabase responses; test invitations and RLS with real accounts after rollout.
 - Google OAuth is wired in the site but requires a Google OAuth client ID and secret in Supabase; email OTP has not been tested end to end. GitHub OAuth remains disabled pending its own OAuth credentials.
 - No users have signed up or connected handles yet, so per-user snapshots and handle verification remain untested.
 - The fetcher compiled and ran successfully in GitHub Actions. Cargo/Rust is unavailable in the local environment.
@@ -37,10 +41,10 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 
 ## Next Steps
 
-1. Sign in with email OTP, create the first profile, and connect platform handles.
-2. Run the `update` workflow manually again; verify platform fetches, verification updates, and per-user snapshot writes.
-3. Verify own-profile/account RLS and leaderboard periods. Install/use Rust locally for `cargo fmt` if desired.
-4. Configure a Google OAuth client and enable the Google provider in Supabase; configure GitHub OAuth separately if GitHub sign-in is wanted.
+1. Apply the groups migration to the existing Supabase project, then deploy the updated site through Pages.
+2. Sign in with email OTP, save profiles and handles, and verify group creation, invitations (including email sign-in in a new tab), outsider isolation, rotation, removal, and leaving/deletion with separate accounts.
+3. Run the `update` workflow manually again; verify platform fetches, handle verification, per-user snapshots, and group/global periods.
+4. Verify own-profile/account RLS. Install/use Rust locally for `cargo fmt` if desired; configure Google/GitHub OAuth credentials separately.
 5. Only after successful verification, decide whether to import or remove the legacy TOML/JSON data.
 
 ## Project Conventions

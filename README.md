@@ -10,6 +10,19 @@ Weekly, bi-weekly, monthly, and all-time Codeforces + LeetCode standings, with u
 4. Add GitHub repository Actions secrets named `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Never put the service-role key in the site or commit it.
 5. In repository Settings → Pages, select **GitHub Actions** as the source. Run the `pages` workflow once, then run `update` to populate initial data.
 
+### Upgrade an existing Supabase project for groups
+
+Run [`supabase/migrations/202610250001_groups.sql`](supabase/migrations/202610250001_groups.sql) once in the Supabase SQL Editor **before deploying the updated site**. It adds groups without changing existing profiles, snapshots, or the collector. New projects get the same tables and functions from `schema.sql`; do not run the migration again after installing the full schema.
+
+### Invitation-only groups
+
+1. Sign in and save your profile, then open **Create or join a group**. Create a group with a name or paste an invitation link/code to join one.
+2. The group dashboard shows only members, with the existing weekly, bi-weekly, monthly, and all-time scores, member count, and totals. Members awaiting their first collector snapshot appear with zero points and an “awaiting stats” label.
+3. The owner can copy an invitation, replace it to invalidate the old link, remove members, or delete the group. Members can leave. Removed members can rejoin with a valid invitation; replace the invitation to stop reuse. Invitations remain available in the same browser through sign-in, including a new email sign-in tab, until joined or dismissed.
+4. The site remembers the dashboard selected for each signed-in account. **Global rankings** is available separately.
+
+Group names and membership are readable only by members through RLS; invitation codes are accessible only through owner-checked functions. Anyone holding an invitation can join after signing in and saving a profile. Individual profiles, handles, and scores remain public in global rankings. Groups do not make those existing public records private.
+
 ## How it works
 
 - Anyone can view the leaderboard and contests. Signed-in users can create their profile and manage their own Codeforces and LeetCode handles. Handle fields accept a username or profile URL, normalize supported URLs to usernames, and link to the matching public profile.
@@ -20,3 +33,7 @@ Weekly, bi-weekly, monthly, and all-time Codeforces + LeetCode standings, with u
 ## Run locally
 
 Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in your shell, then run `cargo run`. Serve `site/` over HTTP to test the browser client; configure the project's URL and anon key in `site/index.html` first.
+
+## Checks
+
+With Node.js 22 or newer, run `npm ci` and `npm test`. The tests execute the SQL migration and access rules in an isolated PGlite PostgreSQL database, with a minimal Supabase auth contract. Browser checks run the real page with mocked Supabase responses. They use Microsoft Edge on Windows or a standard Chromium/Chrome installation on Linux; set `CP_BROWSER` to another Chromium executable if needed. Browser checks are reported as skipped when no browser is available. These checks do not access or change the hosted Supabase project.
