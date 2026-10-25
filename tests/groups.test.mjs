@@ -5,10 +5,10 @@ import { PGlite } from '@electric-sql/pglite';
 
 const schema = await readFile(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
 const migration = await readFile(new URL('../supabase/migrations/202610250001_groups.sql', import.meta.url), 'utf8');
-const alice = '00000000-0000-0000-0000-000000000001';
-const bob = '00000000-0000-0000-0000-000000000002';
-const outsider = '00000000-0000-0000-0000-000000000003';
-const noProfile = '00000000-0000-0000-0000-000000000004';
+const alice = 'user_alice';
+const bob = 'user_bob';
+const outsider = 'user_outsider';
+const noProfile = 'user_without_profile';
 
 test('fresh schema includes the exact incremental groups migration', () => {
   assert.ok(schema.endsWith(migration));
@@ -23,9 +23,8 @@ test('invitation-only groups enforce membership and ownership in PostgreSQL', as
     create role authenticated;
     create role service_role bypassrls;
     create schema auth;
-    create table auth.users (id uuid primary key);
-    create function auth.uid() returns uuid language sql stable as $$
-      select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
+    create function auth.jwt() returns jsonb language sql stable as $$
+      select jsonb_build_object('sub', nullif(current_setting('request.jwt.claim.sub', true), ''));
     $$;
     grant usage on schema auth to anon, authenticated;
   `);
@@ -40,12 +39,11 @@ test('invitation-only groups enforce membership and ownership in PostgreSQL', as
   `);
   await db.exec(migration);
   await db.exec(`
-    insert into auth.users values ('${alice}'), ('${bob}'), ('${outsider}'), ('${noProfile}');
     insert into public.profiles(id, name) values ('${alice}', 'Alice'), ('${bob}', 'Bob'), ('${outsider}', 'Outsider');
     insert into public.snapshots(user_id,taken_at,points,solved,stats) values
-      ('${alice}', '2026-10-01', 100, 10, '{}'),
-      ('${alice}', '2026-10-25', 200, 20, '{}'),
-      ('${outsider}', '2026-10-25', 900, 90, '{}');
+      ('${alice}', '2026-10-01', 100, 10, '{"cf_points":100,"cf_solved":10}'),
+      ('${alice}', '2026-10-25', 200, 20, '{"cf_points":150,"cf_solved":15,"lc_easy":2,"lc_medium":2,"lc_hard":1}'),
+      ('${outsider}', '2026-10-25', 900, 90, '{"cf_points":900,"cf_solved":90}');
   `);
   const as = async user => {
     await db.exec('reset role');
@@ -97,6 +95,7 @@ test('invitation-only groups enforce membership and ownership in PostgreSQL', as
     assert.deepEqual(weekly.map(r => [r.name, r.points, r.solved, r.has_snapshot]), [
       ['Alice', 100, 10, true], ['Bob', 0, 0, false],
     ]);
+    assert.deepEqual([weekly[0].cf_points, weekly[0].cf_solved, weekly[0].lc_points, weekly[0].lc_solved], [50, 5, 50, 5]);
     assert.equal((await db.query('select * from public.group_leaderboard($1, null)', [group])).rows[0].points, 200);
     await assert.rejects(db.query('select * from public.group_leaderboard($1)', [otherGroup]), /access denied/);
     await assert.rejects(db.query('select public.remove_group_member($1, $2)', [group, alice]), /Only the group owner/);

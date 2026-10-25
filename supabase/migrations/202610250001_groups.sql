@@ -1,16 +1,17 @@
--- Existing projects: run this file in the Supabase SQL Editor before deploying the UI.
+-- Existing projects: run this once in the Supabase SQL Editor.
+-- Requires clerk_migration.sql (text ids/JWT sub) and leaderboard_by_platform.sql first.
 begin;
 
 create table public.groups (
   id uuid primary key default gen_random_uuid(),
   name text not null check (name = btrim(name) and char_length(name) between 2 and 60),
-  owner_id uuid not null references public.profiles on delete cascade,
+  owner_id text not null references public.profiles on delete cascade,
   created_at timestamptz not null default now()
 );
 
 create table public.group_members (
   group_id uuid not null references public.groups on delete cascade,
-  user_id uuid not null references public.profiles on delete cascade,
+  user_id text not null references public.profiles on delete cascade,
   joined_at timestamptz not null default now(),
   primary key (group_id, user_id)
 );
@@ -34,7 +35,7 @@ create or replace function private.is_group_member(target_group uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
   select exists (
     select 1 from public.group_members m
-    where m.group_id = target_group and m.user_id = (select auth.uid())
+    where m.group_id = target_group and m.user_id = (select nullif(auth.jwt() ->> 'sub', ''))
   );
 $$;
 revoke all on function private.is_group_member(uuid) from public, anon, authenticated;
@@ -53,7 +54,7 @@ grant all on public.groups, public.group_members, public.group_invites to servic
 create or replace function public.create_group(group_name text)
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare
-  caller uuid := auth.uid();
+  caller text := nullif(auth.jwt() ->> 'sub', '');
   created_group uuid;
 begin
   if caller is null then raise exception 'Sign in first.'; end if;
@@ -74,7 +75,7 @@ $$;
 create or replace function public.join_group(invite_code text)
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare
-  caller uuid := auth.uid();
+  caller text := nullif(auth.jwt() ->> 'sub', '');
   target_group uuid;
   normalized_code text := lower(btrim(invite_code));
 begin
@@ -100,7 +101,7 @@ create or replace function public.group_invite(target_group uuid, rotate boolean
 returns text language plpgsql security definer set search_path = '' as $$
 declare invitation text;
 begin
-  perform 1 from public.groups g where g.id = target_group and g.owner_id = auth.uid() for update;
+  perform 1 from public.groups g where g.id = target_group and g.owner_id = nullif(auth.jwt() ->> 'sub', '') for update;
   if not found then raise exception 'Only the group owner can manage invitations.'; end if;
   if rotate then
     update public.group_invites set code = replace(gen_random_uuid()::text, '-', '')
@@ -113,23 +114,23 @@ $$;
 
 create or replace function public.leave_group(target_group uuid)
 returns void language plpgsql security definer set search_path = '' as $$
-declare group_owner uuid;
+declare group_owner text;
 begin
-  if auth.uid() is null then raise exception 'Sign in first.'; end if;
+  if nullif(auth.jwt() ->> 'sub', '') is null then raise exception 'Sign in first.'; end if;
   select owner_id into group_owner from public.groups where id = target_group for update;
-  if group_owner = auth.uid() then
+  if group_owner = nullif(auth.jwt() ->> 'sub', '') then
     raise exception 'The owner must delete the group instead of leaving it.';
   end if;
-  delete from public.group_members where group_id = target_group and user_id = auth.uid();
+  delete from public.group_members where group_id = target_group and user_id = nullif(auth.jwt() ->> 'sub', '');
 end;
 $$;
 
-create or replace function public.remove_group_member(target_group uuid, member_id uuid)
+create or replace function public.remove_group_member(target_group uuid, member_id text)
 returns void language plpgsql security definer set search_path = '' as $$
 begin
-  perform 1 from public.groups g where g.id = target_group and g.owner_id = auth.uid() for update;
+  perform 1 from public.groups g where g.id = target_group and g.owner_id = nullif(auth.jwt() ->> 'sub', '') for update;
   if not found then raise exception 'Only the group owner can remove members.'; end if;
-  if member_id = auth.uid() then raise exception 'The owner cannot be removed.'; end if;
+  if member_id = nullif(auth.jwt() ->> 'sub', '') then raise exception 'The owner cannot be removed.'; end if;
   delete from public.group_members where group_id = target_group and user_id = member_id;
 end;
 $$;
@@ -137,7 +138,7 @@ $$;
 create or replace function public.delete_group(target_group uuid)
 returns void language plpgsql security definer set search_path = '' as $$
 begin
-  delete from public.groups where id = target_group and owner_id = auth.uid();
+  delete from public.groups where id = target_group and owner_id = nullif(auth.jwt() ->> 'sub', '');
   if not found then raise exception 'Only the group owner can delete the group.'; end if;
 end;
 $$;
@@ -145,7 +146,7 @@ $$;
 -- Keep the collector and global scoring unchanged; filter the same standings by membership.
 -- Include new members before their first snapshot so the dashboard never hides them.
 create or replace function public.group_leaderboard(target_group uuid, days integer default null)
-returns table (name text, points integer, solved integer, cf_rating integer, lc_rating integer, has_snapshot boolean)
+returns table (name text, points integer, solved integer, cf_rating integer, lc_rating integer, cf_points integer, cf_solved integer, lc_points integer, lc_solved integer, has_snapshot boolean)
 language plpgsql stable security invoker set search_path = '' as $$
 begin
   if not private.is_group_member(target_group) then
@@ -153,6 +154,7 @@ begin
   end if;
   return query
     select p.name, coalesce(l.points, 0), coalesce(l.solved, 0), l.cf_rating, l.lc_rating,
+      coalesce(l.cf_points, 0), coalesce(l.cf_solved, 0), coalesce(l.lc_points, 0), coalesce(l.lc_solved, 0),
       l.name is not null
     from public.group_members m
     join public.profiles p on p.id = m.user_id
@@ -164,11 +166,11 @@ $$;
 
 revoke all on function public.create_group(text), public.join_group(text),
   public.group_invite(uuid, boolean), public.leave_group(uuid),
-  public.remove_group_member(uuid, uuid), public.delete_group(uuid),
+  public.remove_group_member(uuid, text), public.delete_group(uuid),
   public.group_leaderboard(uuid, integer) from public, anon, authenticated;
 grant execute on function public.create_group(text), public.join_group(text),
   public.group_invite(uuid, boolean), public.leave_group(uuid),
-  public.remove_group_member(uuid, uuid), public.delete_group(uuid),
+  public.remove_group_member(uuid, text), public.delete_group(uuid),
   public.group_leaderboard(uuid, integer) to authenticated;
 
 commit;

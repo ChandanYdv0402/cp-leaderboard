@@ -1,11 +1,11 @@
 create table public.profiles (
-  id uuid primary key references auth.users on delete cascade,
+  id text primary key, -- Clerk user id (JWT "sub")
   name text not null unique check (char_length(name) between 2 and 32),
   created_at timestamptz not null default now()
 );
 
 create table public.accounts (
-  user_id uuid not null references public.profiles on delete cascade,
+  user_id text not null references public.profiles on delete cascade,
   platform text not null check (platform in ('codeforces', 'leetcode')),
   handle text not null check (handle ~ '^[A-Za-z0-9_.-]{1,40}$'),
   verified boolean not null default false,
@@ -15,7 +15,7 @@ create table public.accounts (
 
 create table public.snapshots (
   id bigint generated always as identity primary key,
-  user_id uuid not null references public.profiles on delete cascade,
+  user_id text not null references public.profiles on delete cascade,
   taken_at timestamptz not null default now(),
   points integer not null,
   solved integer not null,
@@ -49,13 +49,13 @@ create policy "public read contests" on public.contests
   for select using (true);
 
 create policy "users insert own profile" on public.profiles
-  for insert to authenticated with check (auth.uid() = id);
+  for insert to authenticated with check ((select auth.jwt() ->> 'sub') = id);
 create policy "users update own profile" on public.profiles
-  for update to authenticated using (auth.uid() = id) with check (auth.uid() = id);
+  for update to authenticated using ((select auth.jwt() ->> 'sub') = id) with check ((select auth.jwt() ->> 'sub') = id);
 create policy "users manage own accounts" on public.accounts
   for all to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.jwt() ->> 'sub') = user_id)
+  with check ((select auth.jwt() ->> 'sub') = user_id);
 
 grant select on public.profiles, public.accounts, public.snapshots, public.contests to anon, authenticated;
 grant insert, update on public.profiles to authenticated;
@@ -67,6 +67,10 @@ returns table (
   name text,
   points integer,
   solved integer,
+  cf_points integer,
+  cf_solved integer,
+  lc_points integer,
+  lc_solved integer,
   cf_rating integer,
   lc_rating integer
 )
@@ -75,54 +79,88 @@ stable
 security invoker
 set search_path = ''
 as $$
-  with cur as (
-    select distinct on (s.user_id) s.*
-    from public.snapshots s
-    order by s.user_id, s.taken_at desc
+  -- Per-platform totals derived from the stored Stats JSON (scoring: LC easy/medium/hard = 5/10/20).
+  with s as (
+    select
+      user_id, taken_at, cf_rating, lc_rating,
+      coalesce((stats ->> 'cf_points')::integer, 0) as cf_points,
+      coalesce((stats ->> 'cf_solved')::integer, 0) as cf_solved,
+      5 * coalesce((stats ->> 'lc_easy')::integer, 0)
+        + 10 * coalesce((stats ->> 'lc_medium')::integer, 0)
+        + 20 * coalesce((stats ->> 'lc_hard')::integer, 0) as lc_points,
+      coalesce((stats ->> 'lc_easy')::integer, 0)
+        + coalesce((stats ->> 'lc_medium')::integer, 0)
+        + coalesce((stats ->> 'lc_hard')::integer, 0) as lc_solved
+    from public.snapshots
+  ),
+  cur as (
+    select distinct on (user_id) * from s order by user_id, taken_at desc
   ),
   base as (
-    select distinct on (s.user_id) s.*
-    from public.snapshots s
+    select distinct on (user_id) *
+    from s
     where days is not null
-      and s.taken_at <= coalesce(
+      and taken_at <= coalesce(
         (select max(taken_at) from public.snapshots) - make_interval(days => days),
         '-infinity'::timestamptz
       )
-    order by s.user_id, s.taken_at desc
+    order by user_id, taken_at desc
   ),
   first_snapshot as (
-    select distinct on (s.user_id) s.*
-    from public.snapshots s
-    order by s.user_id, s.taken_at asc
+    select distinct on (user_id) * from s order by user_id, taken_at asc
+  ),
+  -- Baseline: snapshot at/before the window start, else earliest (windowed) or zero (all-time).
+  b as (
+    select
+      c.user_id,
+      case when bs.user_id is not null then bs.cf_points when days is null then 0 else f.cf_points end as cf_points,
+      case when bs.user_id is not null then bs.cf_solved when days is null then 0 else f.cf_solved end as cf_solved,
+      case when bs.user_id is not null then bs.lc_points when days is null then 0 else f.lc_points end as lc_points,
+      case when bs.user_id is not null then bs.lc_solved when days is null then 0 else f.lc_solved end as lc_solved
+    from cur c
+    left join base bs on bs.user_id = c.user_id
+    left join first_snapshot f on f.user_id = c.user_id
+  ),
+  d as (
+    select
+      c.user_id,
+      greatest(c.cf_points - b.cf_points, 0) as cf_points,
+      greatest(c.cf_solved - b.cf_solved, 0) as cf_solved,
+      greatest(c.lc_points - b.lc_points, 0) as lc_points,
+      greatest(c.lc_solved - b.lc_solved, 0) as lc_solved,
+      c.cf_rating,
+      c.lc_rating
+    from cur c
+    join b on b.user_id = c.user_id
   )
   select
     p.name,
-    greatest(c.points - coalesce(b.points, case when days is null then 0 else f.points end), 0),
-    greatest(c.solved - coalesce(b.solved, case when days is null then 0 else f.solved end), 0),
-    c.cf_rating,
-    c.lc_rating
-  from cur c
-  join public.profiles p on p.id = c.user_id
-  left join base b on b.user_id = c.user_id
-  left join first_snapshot f on f.user_id = c.user_id
+    d.cf_points + d.lc_points,
+    d.cf_solved + d.lc_solved,
+    d.cf_points, d.cf_solved, d.lc_points, d.lc_solved,
+    d.cf_rating, d.lc_rating
+  from d
+  join public.profiles p on p.id = d.user_id
   order by 2 desc;
 $$;
 
 grant execute on function public.leaderboard(integer) to anon, authenticated;
+
 -- Invitation-only groups (also available as an incremental migration).
--- Existing projects: run this file in the Supabase SQL Editor before deploying the UI.
+-- Existing projects: run this once in the Supabase SQL Editor.
+-- Requires clerk_migration.sql (text ids/JWT sub) and leaderboard_by_platform.sql first.
 begin;
 
 create table public.groups (
   id uuid primary key default gen_random_uuid(),
   name text not null check (name = btrim(name) and char_length(name) between 2 and 60),
-  owner_id uuid not null references public.profiles on delete cascade,
+  owner_id text not null references public.profiles on delete cascade,
   created_at timestamptz not null default now()
 );
 
 create table public.group_members (
   group_id uuid not null references public.groups on delete cascade,
-  user_id uuid not null references public.profiles on delete cascade,
+  user_id text not null references public.profiles on delete cascade,
   joined_at timestamptz not null default now(),
   primary key (group_id, user_id)
 );
@@ -146,7 +184,7 @@ create or replace function private.is_group_member(target_group uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
   select exists (
     select 1 from public.group_members m
-    where m.group_id = target_group and m.user_id = (select auth.uid())
+    where m.group_id = target_group and m.user_id = (select nullif(auth.jwt() ->> 'sub', ''))
   );
 $$;
 revoke all on function private.is_group_member(uuid) from public, anon, authenticated;
@@ -165,7 +203,7 @@ grant all on public.groups, public.group_members, public.group_invites to servic
 create or replace function public.create_group(group_name text)
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare
-  caller uuid := auth.uid();
+  caller text := nullif(auth.jwt() ->> 'sub', '');
   created_group uuid;
 begin
   if caller is null then raise exception 'Sign in first.'; end if;
@@ -186,7 +224,7 @@ $$;
 create or replace function public.join_group(invite_code text)
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare
-  caller uuid := auth.uid();
+  caller text := nullif(auth.jwt() ->> 'sub', '');
   target_group uuid;
   normalized_code text := lower(btrim(invite_code));
 begin
@@ -212,7 +250,7 @@ create or replace function public.group_invite(target_group uuid, rotate boolean
 returns text language plpgsql security definer set search_path = '' as $$
 declare invitation text;
 begin
-  perform 1 from public.groups g where g.id = target_group and g.owner_id = auth.uid() for update;
+  perform 1 from public.groups g where g.id = target_group and g.owner_id = nullif(auth.jwt() ->> 'sub', '') for update;
   if not found then raise exception 'Only the group owner can manage invitations.'; end if;
   if rotate then
     update public.group_invites set code = replace(gen_random_uuid()::text, '-', '')
@@ -225,23 +263,23 @@ $$;
 
 create or replace function public.leave_group(target_group uuid)
 returns void language plpgsql security definer set search_path = '' as $$
-declare group_owner uuid;
+declare group_owner text;
 begin
-  if auth.uid() is null then raise exception 'Sign in first.'; end if;
+  if nullif(auth.jwt() ->> 'sub', '') is null then raise exception 'Sign in first.'; end if;
   select owner_id into group_owner from public.groups where id = target_group for update;
-  if group_owner = auth.uid() then
+  if group_owner = nullif(auth.jwt() ->> 'sub', '') then
     raise exception 'The owner must delete the group instead of leaving it.';
   end if;
-  delete from public.group_members where group_id = target_group and user_id = auth.uid();
+  delete from public.group_members where group_id = target_group and user_id = nullif(auth.jwt() ->> 'sub', '');
 end;
 $$;
 
-create or replace function public.remove_group_member(target_group uuid, member_id uuid)
+create or replace function public.remove_group_member(target_group uuid, member_id text)
 returns void language plpgsql security definer set search_path = '' as $$
 begin
-  perform 1 from public.groups g where g.id = target_group and g.owner_id = auth.uid() for update;
+  perform 1 from public.groups g where g.id = target_group and g.owner_id = nullif(auth.jwt() ->> 'sub', '') for update;
   if not found then raise exception 'Only the group owner can remove members.'; end if;
-  if member_id = auth.uid() then raise exception 'The owner cannot be removed.'; end if;
+  if member_id = nullif(auth.jwt() ->> 'sub', '') then raise exception 'The owner cannot be removed.'; end if;
   delete from public.group_members where group_id = target_group and user_id = member_id;
 end;
 $$;
@@ -249,7 +287,7 @@ $$;
 create or replace function public.delete_group(target_group uuid)
 returns void language plpgsql security definer set search_path = '' as $$
 begin
-  delete from public.groups where id = target_group and owner_id = auth.uid();
+  delete from public.groups where id = target_group and owner_id = nullif(auth.jwt() ->> 'sub', '');
   if not found then raise exception 'Only the group owner can delete the group.'; end if;
 end;
 $$;
@@ -257,7 +295,7 @@ $$;
 -- Keep the collector and global scoring unchanged; filter the same standings by membership.
 -- Include new members before their first snapshot so the dashboard never hides them.
 create or replace function public.group_leaderboard(target_group uuid, days integer default null)
-returns table (name text, points integer, solved integer, cf_rating integer, lc_rating integer, has_snapshot boolean)
+returns table (name text, points integer, solved integer, cf_rating integer, lc_rating integer, cf_points integer, cf_solved integer, lc_points integer, lc_solved integer, has_snapshot boolean)
 language plpgsql stable security invoker set search_path = '' as $$
 begin
   if not private.is_group_member(target_group) then
@@ -265,6 +303,7 @@ begin
   end if;
   return query
     select p.name, coalesce(l.points, 0), coalesce(l.solved, 0), l.cf_rating, l.lc_rating,
+      coalesce(l.cf_points, 0), coalesce(l.cf_solved, 0), coalesce(l.lc_points, 0), coalesce(l.lc_solved, 0),
       l.name is not null
     from public.group_members m
     join public.profiles p on p.id = m.user_id
@@ -276,11 +315,11 @@ $$;
 
 revoke all on function public.create_group(text), public.join_group(text),
   public.group_invite(uuid, boolean), public.leave_group(uuid),
-  public.remove_group_member(uuid, uuid), public.delete_group(uuid),
+  public.remove_group_member(uuid, text), public.delete_group(uuid),
   public.group_leaderboard(uuid, integer) from public, anon, authenticated;
 grant execute on function public.create_group(text), public.join_group(text),
   public.group_invite(uuid, boolean), public.leave_group(uuid),
-  public.remove_group_member(uuid, uuid), public.delete_group(uuid),
+  public.remove_group_member(uuid, text), public.delete_group(uuid),
   public.group_leaderboard(uuid, integer) to authenticated;
 
 commit;

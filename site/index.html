@@ -4,77 +4,485 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CP Leaderboard</title>
+<script>try { const t = localStorage.getItem("cp-theme"); if (t && t !== "default") document.documentElement.dataset.theme = t; } catch {}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#fff; --fg:#111; --muted:#666; --line:#e5e5e5; --accent:#2563eb; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0f1115; --fg:#e8e8e8; --muted:#999; --line:#2a2d35; --accent:#60a5fa; } }
-  body { background:var(--bg); color:var(--fg); font:15px/1.5 system-ui,sans-serif; max-width:760px; margin:0 auto; padding:24px 16px; }
-  header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
-  h1 { margin:0 0 4px } h2 { margin-top:28px } .muted { color:var(--muted); font-size:13px }
-  .tabs button { background:none; border:1px solid var(--line); color:var(--fg); padding:6px 12px; border-radius:6px; cursor:pointer; margin-right:6px }
-  .tabs button.on { border-color:var(--accent); color:var(--accent) }
-  button, input, select { font:inherit } button { cursor:pointer }
-  .auth, .profile { border-bottom:1px solid var(--line); padding:16px 0; }
-  .auth { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
-  .email-address { display:flex; align-items:center; gap:0; border:1px solid var(--line); border-radius:4px; background:var(--bg); color:var(--muted); font-size:15px; white-space:nowrap; }
-  .email-address input { width:10ch; border:0; background:transparent; }
-  .email-address span { padding-right:8px; }
-  .profile form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; align-items:end; }
-  .profile summary { cursor:pointer; font-weight:600; }
-  .profile form { margin-top:16px; }
-  label { display:grid; gap:4px; color:var(--muted); font-size:13px; }
-  .profile-link { font-size:13px; }
-  input { min-width:0; padding:7px 8px; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:4px; }
-  button.action { padding:7px 10px; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:4px; }
-  [hidden] { display:none !important; }
-  .dashboard-nav { display:flex; align-items:end; justify-content:space-between; gap:12px; margin-top:24px; }
-  .dashboard-nav label { flex:1; max-width:420px; }
-  select { min-width:0; padding:8px; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:4px; }
-  .text-button { background:none; border:0; padding:8px 0; color:var(--accent); }
-  .group-tools { padding:16px; margin:20px 0; border:1px solid var(--line); border-radius:8px; }
-  .group-tools summary, .members summary { cursor:pointer; font-weight:600; }
+  /* 8-bit look (after 8bitcn/ui): grayscale, square corners, pixel font for chrome, stepped pixel borders.
+     Palette and fonts live here; charts read these too. */
+  :root {
+    color-scheme:dark;
+    --bg:#070707; --panel:#121212; --head:#1a1a1a; --row:#0f0f0f; --hover:#1c1c1c;
+    --fg:#f5f5f5; --muted:#a3a3a3; --faint:#6b6b6b; --line:#262626; --rail:rgba(255,255,255,.1);
+    --primary:#e4e4e4; --primary-fg:#121212; --ring:#737373;
+    --cf:#5fa8d3; --lc:#e0a43a; --all:#c9c9c9; --gold:#d4b33a; --hot:#ff4d4d;
+    --sel:#262626; --track:#1a1a1a; --track-2:#222;
+    --pixel:"Press Start 2P", ui-monospace, monospace;
+    --text:ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --chart-font:ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  /* Themes: dark palettes from 8bitcn/ui (lib/themes.ts), mapped onto this page's tokens. Default keeps the tuned grayscale above. */
+  :root[data-theme="sega"] { --bg:oklch(0.1 0.1 280); --fg:oklch(0.9 0.02 260); --panel:color-mix(in oklch, oklch(0.1 0.1 280), oklch(0.9 0.02 260) 6%); --head:color-mix(in oklch, oklch(0.1 0.1 280), oklch(0.9 0.02 260) 11%);
+    --row:color-mix(in oklch, oklch(0.1 0.1 280), oklch(0.9 0.02 260) 3%); --hover:color-mix(in oklch, oklch(0.1 0.1 280), oklch(0.9 0.02 260) 8%); --sel:color-mix(in oklch, oklch(0.1 0.1 280), oklch(0.9 0.02 260) 16%);
+    --track:color-mix(in oklch, oklch(0.1 0.1 280), oklch(0.9 0.02 260) 10%); --track-2:color-mix(in oklch, oklch(0.1 0.1 280), oklch(0.9 0.02 260) 14%);
+    --muted:oklch(0.85 0.1 220); --faint:color-mix(in oklch, oklch(0.85 0.1 220) 55%, oklch(0.1 0.1 280)); --line:oklch(0.5 0.2 260); --rail:color-mix(in oklch, oklch(0.9 0.02 260) 14%, transparent);
+    --primary:oklch(0.5 0.2 260); --primary-fg:oklch(0.9 0.02 260); --ring:oklch(0.5 0.2 260); --hot:oklch(0.5 0.2 20); }
+  :root[data-theme="gameboy"] { --bg:oklch(0.2 0.1 140); --fg:oklch(0.8 0.2 120); --panel:color-mix(in oklch, oklch(0.2 0.1 140), oklch(0.8 0.2 120) 6%); --head:color-mix(in oklch, oklch(0.2 0.1 140), oklch(0.8 0.2 120) 11%);
+    --row:color-mix(in oklch, oklch(0.2 0.1 140), oklch(0.8 0.2 120) 3%); --hover:color-mix(in oklch, oklch(0.2 0.1 140), oklch(0.8 0.2 120) 8%); --sel:color-mix(in oklch, oklch(0.2 0.1 140), oklch(0.8 0.2 120) 16%);
+    --track:color-mix(in oklch, oklch(0.2 0.1 140), oklch(0.8 0.2 120) 10%); --track-2:color-mix(in oklch, oklch(0.2 0.1 140), oklch(0.8 0.2 120) 14%);
+    --muted:oklch(0.7 0.2 120); --faint:color-mix(in oklch, oklch(0.7 0.2 120) 55%, oklch(0.2 0.1 140)); --line:oklch(0.4 0.2 140); --rail:color-mix(in oklch, oklch(0.8 0.2 120) 14%, transparent);
+    --primary:oklch(0.7 0.2 120); --primary-fg:oklch(0.2 0.1 140); --ring:oklch(0.8 0.2 120); --hot:oklch(0.5 0.3 30); }
+  :root[data-theme="atari"] { --bg:oklch(0.2 0 0); --fg:oklch(0.9 0 0); --panel:color-mix(in oklch, oklch(0.4 0 0), oklch(0.9 0 0) 6%); --head:color-mix(in oklch, oklch(0.4 0 0), oklch(0.9 0 0) 11%);
+    --row:color-mix(in oklch, oklch(0.2 0 0), oklch(0.9 0 0) 3%); --hover:color-mix(in oklch, oklch(0.2 0 0), oklch(0.9 0 0) 8%); --sel:color-mix(in oklch, oklch(0.2 0 0), oklch(0.9 0 0) 16%);
+    --track:color-mix(in oklch, oklch(0.2 0 0), oklch(0.9 0 0) 10%); --track-2:color-mix(in oklch, oklch(0.2 0 0), oklch(0.9 0 0) 14%);
+    --muted:oklch(0.7 0 0); --faint:color-mix(in oklch, oklch(0.7 0 0) 55%, oklch(0.2 0 0)); --line:oklch(0.4 0 0); --rail:color-mix(in oklch, oklch(0.9 0 0) 14%, transparent);
+    --primary:oklch(0.4 0.2 60); --primary-fg:oklch(0.9 0 0); --ring:oklch(0 0 0); --hot:oklch(0.4 0.3 20); }
+  :root[data-theme="nintendo"] { --bg:oklch(0.16 0.05 260); --fg:oklch(1 0 0); --panel:color-mix(in oklch, oklch(0.2 0.06 260), oklch(1 0 0) 6%); --head:color-mix(in oklch, oklch(0.2 0.06 260), oklch(1 0 0) 11%);
+    --row:color-mix(in oklch, oklch(0.16 0.05 260), oklch(1 0 0) 3%); --hover:color-mix(in oklch, oklch(0.16 0.05 260), oklch(1 0 0) 8%); --sel:color-mix(in oklch, oklch(0.16 0.05 260), oklch(1 0 0) 16%);
+    --track:color-mix(in oklch, oklch(0.16 0.05 260), oklch(1 0 0) 10%); --track-2:color-mix(in oklch, oklch(0.16 0.05 260), oklch(1 0 0) 14%);
+    --muted:oklch(0.7 0 0); --faint:color-mix(in oklch, oklch(0.7 0 0) 55%, oklch(0.16 0.05 260)); --line:oklch(1 0 0); --rail:color-mix(in oklch, oklch(1 0 0) 14%, transparent);
+    --primary:oklch(0.5 0.2 280); --primary-fg:oklch(0.9 0.05 280); --ring:oklch(0.7 0.15 250); --hot:oklch(0.4 0.2 10); }
+  :root[data-theme="arcade"] { --bg:oklch(0.02 0.01 280); --fg:oklch(0.98 0.01 280); --panel:color-mix(in oklch, oklch(0.05 0.02 280), oklch(0.98 0.01 280) 6%); --head:color-mix(in oklch, oklch(0.05 0.02 280), oklch(0.98 0.01 280) 11%);
+    --row:color-mix(in oklch, oklch(0.02 0.01 280), oklch(0.98 0.01 280) 3%); --hover:color-mix(in oklch, oklch(0.02 0.01 280), oklch(0.98 0.01 280) 8%); --sel:color-mix(in oklch, oklch(0.02 0.01 280), oklch(0.98 0.01 280) 16%);
+    --track:color-mix(in oklch, oklch(0.02 0.01 280), oklch(0.98 0.01 280) 10%); --track-2:color-mix(in oklch, oklch(0.02 0.01 280), oklch(0.98 0.01 280) 14%);
+    --muted:oklch(0.8 0.1 280); --faint:color-mix(in oklch, oklch(0.8 0.1 280) 55%, oklch(0.02 0.01 280)); --line:oklch(0.8 0.3 320); --rail:color-mix(in oklch, oklch(0.98 0.01 280) 14%, transparent);
+    --primary:oklch(0.8 0.3 320); --primary-fg:oklch(0.05 0.02 320); --ring:oklch(0.6 0.25 320); --hot:oklch(0.8 0.35 20); }
+  :root[data-theme="neo-geo"] { --bg:oklch(0.05 0.02 25); --fg:oklch(0.95 0.01 25); --panel:color-mix(in oklch, oklch(0.1 0.03 25), oklch(0.95 0.01 25) 6%); --head:color-mix(in oklch, oklch(0.1 0.03 25), oklch(0.95 0.01 25) 11%);
+    --row:color-mix(in oklch, oklch(0.05 0.02 25), oklch(0.95 0.01 25) 3%); --hover:color-mix(in oklch, oklch(0.05 0.02 25), oklch(0.95 0.01 25) 8%); --sel:color-mix(in oklch, oklch(0.05 0.02 25), oklch(0.95 0.01 25) 16%);
+    --track:color-mix(in oklch, oklch(0.05 0.02 25), oklch(0.95 0.01 25) 10%); --track-2:color-mix(in oklch, oklch(0.05 0.02 25), oklch(0.95 0.01 25) 14%);
+    --muted:oklch(0.7 0.1 25); --faint:color-mix(in oklch, oklch(0.7 0.1 25) 55%, oklch(0.05 0.02 25)); --line:oklch(0.2 0.08 25); --rail:color-mix(in oklch, oklch(0.95 0.01 25) 14%, transparent);
+    --primary:oklch(0.75 0.3 25); --primary-fg:oklch(0.05 0.02 25); --ring:oklch(0.55 0.25 25); --hot:oklch(0.8 0.35 20); }
+  :root[data-theme="soft-pop"] { --bg:oklch(0 0 0); --fg:oklch(1 0 0); --panel:color-mix(in oklch, oklch(0.2455 0.0217 257.2823), oklch(1 0 0) 6%); --head:color-mix(in oklch, oklch(0.2455 0.0217 257.2823), oklch(1 0 0) 11%);
+    --row:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 3%); --hover:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 8%); --sel:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 16%);
+    --track:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 10%); --track-2:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 14%);
+    --muted:oklch(0.8452 0 0); --faint:color-mix(in oklch, oklch(0.8452 0 0) 55%, oklch(0 0 0)); --line:oklch(0.4459 0 0); --rail:color-mix(in oklch, oklch(1 0 0) 14%, transparent);
+    --primary:oklch(0.6801 0.1583 276.9349); --primary-fg:oklch(0 0 0); --ring:oklch(0.6801 0.1583 276.9349); --hot:oklch(0.7106 0.1661 22.2162); }
+  :root[data-theme="vhs"] { --bg:oklch(0.166 0.0254 298.9423); --fg:oklch(0.9024 0.0604 306.703); --panel:color-mix(in oklch, oklch(0.1962 0.0365 301.0125), oklch(0.9024 0.0604 306.703) 6%); --head:color-mix(in oklch, oklch(0.1962 0.0365 301.0125), oklch(0.9024 0.0604 306.703) 11%);
+    --row:color-mix(in oklch, oklch(0.166 0.0254 298.9423), oklch(0.9024 0.0604 306.703) 3%); --hover:color-mix(in oklch, oklch(0.166 0.0254 298.9423), oklch(0.9024 0.0604 306.703) 8%); --sel:color-mix(in oklch, oklch(0.166 0.0254 298.9423), oklch(0.9024 0.0604 306.703) 16%);
+    --track:color-mix(in oklch, oklch(0.166 0.0254 298.9423), oklch(0.9024 0.0604 306.703) 10%); --track-2:color-mix(in oklch, oklch(0.166 0.0254 298.9423), oklch(0.9024 0.0604 306.703) 14%);
+    --muted:oklch(0.7161 0.0091 56.259); --faint:color-mix(in oklch, oklch(0.7161 0.0091 56.259) 55%, oklch(0.166 0.0254 298.9423)); --line:oklch(0.2905 0.1432 302.7167); --rail:color-mix(in oklch, oklch(0.9024 0.0604 306.703) 14%, transparent);
+    --primary:oklch(0.6668 0.2591 322.1499); --primary-fg:oklch(0.2795 0.0368 260.031); --ring:oklch(0.6847 0.1479 237.3225); --hot:oklch(0.5246 0.199 3.9582); }
+  :root[data-theme="pacman"] { --bg:oklch(0 0 0); --fg:oklch(1 0 0); --panel:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 6%); --head:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 11%);
+    --row:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 3%); --hover:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 8%); --sel:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 16%);
+    --track:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 10%); --track-2:color-mix(in oklch, oklch(0 0 0), oklch(1 0 0) 14%);
+    --muted:oklch(0.7155 0 0); --faint:color-mix(in oklch, oklch(0.7155 0 0) 55%, oklch(0 0 0)); --line:oklch(0.4882 0.2172 264.3763); --rail:color-mix(in oklch, oklch(1 0 0) 14%, transparent);
+    --primary:oklch(0.9451 0.1243 101.5399); --primary-fg:oklch(0.2857 0.0639 53.8133); --ring:oklch(0.7137 0.1434 254.624); --hot:oklch(0.5143 0.1978 16.935); }
+  :root[data-theme="rusty-byte"] { --bg:oklch(0.15 0.05 40); --fg:oklch(0.95 0.02 95); --panel:color-mix(in oklch, oklch(0.18 0.05 40), oklch(0.95 0.02 95) 6%); --head:color-mix(in oklch, oklch(0.18 0.05 40), oklch(0.95 0.02 95) 11%);
+    --row:color-mix(in oklch, oklch(0.15 0.05 40), oklch(0.95 0.02 95) 3%); --hover:color-mix(in oklch, oklch(0.15 0.05 40), oklch(0.95 0.02 95) 8%); --sel:color-mix(in oklch, oklch(0.15 0.05 40), oklch(0.95 0.02 95) 16%);
+    --track:color-mix(in oklch, oklch(0.15 0.05 40), oklch(0.95 0.02 95) 10%); --track-2:color-mix(in oklch, oklch(0.15 0.05 40), oklch(0.95 0.02 95) 14%);
+    --muted:oklch(0.8 0.05 80); --faint:color-mix(in oklch, oklch(0.8 0.05 80) 55%, oklch(0.15 0.05 40)); --line:oklch(0.25 0.05 40); --rail:color-mix(in oklch, oklch(0.95 0.02 95) 14%, transparent);
+    --primary:oklch(0.7 0.2 40); --primary-fg:oklch(0.1 0.02 40); --ring:oklch(0.5 0.2 40); --hot:oklch(0.55 0.25 20); }
+  :root[data-theme="zelda"] { --bg:oklch(0.15 0.05 120); --fg:oklch(0.95 0.02 95); --panel:color-mix(in oklch, oklch(0.12 0.02 20), oklch(0.95 0.02 95) 6%); --head:color-mix(in oklch, oklch(0.12 0.02 20), oklch(0.95 0.02 95) 11%);
+    --row:color-mix(in oklch, oklch(0.15 0.05 120), oklch(0.95 0.02 95) 3%); --hover:color-mix(in oklch, oklch(0.15 0.05 120), oklch(0.95 0.02 95) 8%); --sel:color-mix(in oklch, oklch(0.15 0.05 120), oklch(0.95 0.02 95) 16%);
+    --track:color-mix(in oklch, oklch(0.15 0.05 120), oklch(0.95 0.02 95) 10%); --track-2:color-mix(in oklch, oklch(0.15 0.05 120), oklch(0.95 0.02 95) 14%);
+    --muted:oklch(0.8 0.02 95); --faint:color-mix(in oklch, oklch(0.8 0.02 95) 55%, oklch(0.15 0.05 120)); --line:oklch(0.25 0.02 90); --rail:color-mix(in oklch, oklch(0.95 0.02 95) 14%, transparent);
+    --primary:oklch(0.85 0.2 90); --primary-fg:oklch(0.05 0.02 10); --ring:oklch(0.35 0.1 120); --hot:oklch(0.55 0.25 30); }
+  :root[data-theme="dungeon-torch"] { --bg:oklch(0.15 0.02 40); --fg:oklch(0.92 0.03 55); --panel:color-mix(in oklch, oklch(0.18 0.02 42), oklch(0.92 0.03 55) 6%); --head:color-mix(in oklch, oklch(0.18 0.02 42), oklch(0.92 0.03 55) 11%);
+    --row:color-mix(in oklch, oklch(0.15 0.02 40), oklch(0.92 0.03 55) 3%); --hover:color-mix(in oklch, oklch(0.15 0.02 40), oklch(0.92 0.03 55) 8%); --sel:color-mix(in oklch, oklch(0.15 0.02 40), oklch(0.92 0.03 55) 16%);
+    --track:color-mix(in oklch, oklch(0.15 0.02 40), oklch(0.92 0.03 55) 10%); --track-2:color-mix(in oklch, oklch(0.15 0.02 40), oklch(0.92 0.03 55) 14%);
+    --muted:oklch(0.6 0.04 50); --faint:color-mix(in oklch, oklch(0.6 0.04 50) 55%, oklch(0.15 0.02 40)); --line:oklch(0.3 0.03 45); --rail:color-mix(in oklch, oklch(0.92 0.03 55) 14%, transparent);
+    --primary:oklch(0.7 0.15 55); --primary-fg:oklch(0.12 0.01 40); --ring:oklch(0.7 0.15 55); --hot:oklch(0.55 0.2 25); }
+  :root[data-theme="space-station"] { --bg:oklch(0.13 0.02 240); --fg:oklch(0.9 0.02 220); --panel:color-mix(in oklch, oklch(0.16 0.02 238), oklch(0.9 0.02 220) 6%); --head:color-mix(in oklch, oklch(0.16 0.02 238), oklch(0.9 0.02 220) 11%);
+    --row:color-mix(in oklch, oklch(0.13 0.02 240), oklch(0.9 0.02 220) 3%); --hover:color-mix(in oklch, oklch(0.13 0.02 240), oklch(0.9 0.02 220) 8%); --sel:color-mix(in oklch, oklch(0.13 0.02 240), oklch(0.9 0.02 220) 16%);
+    --track:color-mix(in oklch, oklch(0.13 0.02 240), oklch(0.9 0.02 220) 10%); --track-2:color-mix(in oklch, oklch(0.13 0.02 240), oklch(0.9 0.02 220) 14%);
+    --muted:oklch(0.58 0.03 230); --faint:color-mix(in oklch, oklch(0.58 0.03 230) 55%, oklch(0.13 0.02 240)); --line:oklch(0.28 0.03 235); --rail:color-mix(in oklch, oklch(0.9 0.02 220) 14%, transparent);
+    --primary:oklch(0.65 0.15 220); --primary-fg:oklch(0.1 0.01 240); --ring:oklch(0.65 0.15 220); --hot:oklch(0.55 0.2 25); }
+  :root[data-theme="pixel-forest"] { --bg:oklch(0.14 0.03 140); --fg:oklch(0.88 0.03 138); --panel:color-mix(in oklch, oklch(0.17 0.03 142), oklch(0.88 0.03 138) 6%); --head:color-mix(in oklch, oklch(0.17 0.03 142), oklch(0.88 0.03 138) 11%);
+    --row:color-mix(in oklch, oklch(0.14 0.03 140), oklch(0.88 0.03 138) 3%); --hover:color-mix(in oklch, oklch(0.14 0.03 140), oklch(0.88 0.03 138) 8%); --sel:color-mix(in oklch, oklch(0.14 0.03 140), oklch(0.88 0.03 138) 16%);
+    --track:color-mix(in oklch, oklch(0.14 0.03 140), oklch(0.88 0.03 138) 10%); --track-2:color-mix(in oklch, oklch(0.14 0.03 140), oklch(0.88 0.03 138) 14%);
+    --muted:oklch(0.55 0.04 140); --faint:color-mix(in oklch, oklch(0.55 0.04 140) 55%, oklch(0.14 0.03 140)); --line:oklch(0.28 0.04 140); --rail:color-mix(in oklch, oklch(0.88 0.03 138) 14%, transparent);
+    --primary:oklch(0.6 0.15 145); --primary-fg:oklch(0.12 0.02 140); --ring:oklch(0.6 0.15 145); --hot:oklch(0.55 0.2 25); }
+  :root[data-theme="ice-cavern"] { --bg:oklch(0.12 0.02 250); --fg:oklch(0.9 0.02 235); --panel:color-mix(in oklch, oklch(0.15 0.02 248), oklch(0.9 0.02 235) 6%); --head:color-mix(in oklch, oklch(0.15 0.02 248), oklch(0.9 0.02 235) 11%);
+    --row:color-mix(in oklch, oklch(0.12 0.02 250), oklch(0.9 0.02 235) 3%); --hover:color-mix(in oklch, oklch(0.12 0.02 250), oklch(0.9 0.02 235) 8%); --sel:color-mix(in oklch, oklch(0.12 0.02 250), oklch(0.9 0.02 235) 16%);
+    --track:color-mix(in oklch, oklch(0.12 0.02 250), oklch(0.9 0.02 235) 10%); --track-2:color-mix(in oklch, oklch(0.12 0.02 250), oklch(0.9 0.02 235) 14%);
+    --muted:oklch(0.55 0.03 240); --faint:color-mix(in oklch, oklch(0.55 0.03 240) 55%, oklch(0.12 0.02 250)); --line:oklch(0.25 0.03 248); --rail:color-mix(in oklch, oklch(0.9 0.02 235) 14%, transparent);
+    --primary:oklch(0.65 0.12 230); --primary-fg:oklch(0.1 0.01 250); --ring:oklch(0.65 0.12 230); --hot:oklch(0.55 0.2 25); }
+  :root[data-theme="lava-core"] { --bg:oklch(0.1 0.02 25); --fg:oklch(0.9 0.03 35); --panel:color-mix(in oklch, oklch(0.13 0.02 27), oklch(0.9 0.03 35) 6%); --head:color-mix(in oklch, oklch(0.13 0.02 27), oklch(0.9 0.03 35) 11%);
+    --row:color-mix(in oklch, oklch(0.1 0.02 25), oklch(0.9 0.03 35) 3%); --hover:color-mix(in oklch, oklch(0.1 0.02 25), oklch(0.9 0.03 35) 8%); --sel:color-mix(in oklch, oklch(0.1 0.02 25), oklch(0.9 0.03 35) 16%);
+    --track:color-mix(in oklch, oklch(0.1 0.02 25), oklch(0.9 0.03 35) 10%); --track-2:color-mix(in oklch, oklch(0.1 0.02 25), oklch(0.9 0.03 35) 14%);
+    --muted:oklch(0.55 0.04 30); --faint:color-mix(in oklch, oklch(0.55 0.04 30) 55%, oklch(0.1 0.02 25)); --line:oklch(0.25 0.03 28); --rail:color-mix(in oklch, oklch(0.9 0.03 35) 14%, transparent);
+    --primary:oklch(0.65 0.2 30); --primary-fg:oklch(0.08 0.01 25); --ring:oklch(0.65 0.2 30); --hot:oklch(0.55 0.22 25); }
+  :root[data-theme="glitch-mode"] { --bg:oklch(0.05 0 0); --fg:oklch(0.9 0.02 195); --panel:color-mix(in oklch, oklch(0.08 0 0), oklch(0.9 0.02 195) 6%); --head:color-mix(in oklch, oklch(0.08 0 0), oklch(0.9 0.02 195) 11%);
+    --row:color-mix(in oklch, oklch(0.05 0 0), oklch(0.9 0.02 195) 3%); --hover:color-mix(in oklch, oklch(0.05 0 0), oklch(0.9 0.02 195) 8%); --sel:color-mix(in oklch, oklch(0.05 0 0), oklch(0.9 0.02 195) 16%);
+    --track:color-mix(in oklch, oklch(0.05 0 0), oklch(0.9 0.02 195) 10%); --track-2:color-mix(in oklch, oklch(0.05 0 0), oklch(0.9 0.02 195) 14%);
+    --muted:oklch(0.55 0.03 195); --faint:color-mix(in oklch, oklch(0.55 0.03 195) 55%, oklch(0.05 0 0)); --line:oklch(0.2 0.02 195); --rail:color-mix(in oklch, oklch(0.9 0.02 195) 14%, transparent);
+    --primary:oklch(0.7 0.2 195); --primary-fg:oklch(0.05 0 0); --ring:oklch(0.7 0.2 195); --hot:oklch(0.55 0.2 25); }
+  :root[data-theme="dwarven-vault"] { --bg:oklch(0.14 0.01 70); --fg:oklch(0.88 0.03 80); --panel:color-mix(in oklch, oklch(0.17 0.015 72), oklch(0.88 0.03 80) 6%); --head:color-mix(in oklch, oklch(0.17 0.015 72), oklch(0.88 0.03 80) 11%);
+    --row:color-mix(in oklch, oklch(0.14 0.01 70), oklch(0.88 0.03 80) 3%); --hover:color-mix(in oklch, oklch(0.14 0.01 70), oklch(0.88 0.03 80) 8%); --sel:color-mix(in oklch, oklch(0.14 0.01 70), oklch(0.88 0.03 80) 16%);
+    --track:color-mix(in oklch, oklch(0.14 0.01 70), oklch(0.88 0.03 80) 10%); --track-2:color-mix(in oklch, oklch(0.14 0.01 70), oklch(0.88 0.03 80) 14%);
+    --muted:oklch(0.55 0.03 78); --faint:color-mix(in oklch, oklch(0.55 0.03 78) 55%, oklch(0.14 0.01 70)); --line:oklch(0.28 0.02 72); --rail:color-mix(in oklch, oklch(0.88 0.03 80) 14%, transparent);
+    --primary:oklch(0.7 0.12 80); --primary-fg:oklch(0.12 0.01 70); --ring:oklch(0.7 0.12 80); --hot:oklch(0.55 0.2 25); }
+  :root[data-theme="dragon-hoard"] { --bg:oklch(0.08 0.01 30); --fg:oklch(0.88 0.04 50); --panel:color-mix(in oklch, oklch(0.11 0.015 32), oklch(0.88 0.04 50) 6%); --head:color-mix(in oklch, oklch(0.11 0.015 32), oklch(0.88 0.04 50) 11%);
+    --row:color-mix(in oklch, oklch(0.08 0.01 30), oklch(0.88 0.04 50) 3%); --hover:color-mix(in oklch, oklch(0.08 0.01 30), oklch(0.88 0.04 50) 8%); --sel:color-mix(in oklch, oklch(0.08 0.01 30), oklch(0.88 0.04 50) 16%);
+    --track:color-mix(in oklch, oklch(0.08 0.01 30), oklch(0.88 0.04 50) 10%); --track-2:color-mix(in oklch, oklch(0.08 0.01 30), oklch(0.88 0.04 50) 14%);
+    --muted:oklch(0.55 0.04 45); --faint:color-mix(in oklch, oklch(0.55 0.04 45) 55%, oklch(0.08 0.01 30)); --line:oklch(0.22 0.02 35); --rail:color-mix(in oklch, oklch(0.88 0.04 50) 14%, transparent);
+    --primary:oklch(0.6 0.2 20); --primary-fg:oklch(0.08 0.01 30); --ring:oklch(0.6 0.2 20); --hot:oklch(0.55 0.2 25); }
+  :root[data-theme="ancient-runes"] { --bg:oklch(0.14 0.02 185); --fg:oklch(0.88 0.02 190); --panel:color-mix(in oklch, oklch(0.17 0.02 187), oklch(0.88 0.02 190) 6%); --head:color-mix(in oklch, oklch(0.17 0.02 187), oklch(0.88 0.02 190) 11%);
+    --row:color-mix(in oklch, oklch(0.14 0.02 185), oklch(0.88 0.02 190) 3%); --hover:color-mix(in oklch, oklch(0.14 0.02 185), oklch(0.88 0.02 190) 8%); --sel:color-mix(in oklch, oklch(0.14 0.02 185), oklch(0.88 0.02 190) 16%);
+    --track:color-mix(in oklch, oklch(0.14 0.02 185), oklch(0.88 0.02 190) 10%); --track-2:color-mix(in oklch, oklch(0.14 0.02 185), oklch(0.88 0.02 190) 14%);
+    --muted:oklch(0.55 0.03 188); --faint:color-mix(in oklch, oklch(0.55 0.03 188) 55%, oklch(0.14 0.02 185)); --line:oklch(0.28 0.02 187); --rail:color-mix(in oklch, oklch(0.88 0.02 190) 14%, transparent);
+    --primary:oklch(0.6 0.12 185); --primary-fg:oklch(0.12 0.01 185); --ring:oklch(0.6 0.12 185); --hot:oklch(0.55 0.2 25); }
+  * { box-sizing:border-box }
+  [hidden] { display:none !important }
+  html { background:var(--bg); }
+  /* Centered column with dashed side rails */
+  body { background:var(--bg); color:var(--fg); font:16px/1.6 var(--text); max-width:1400px; min-height:100vh; margin:0 auto; padding:0 clamp(14px, 3vw, 28px) 24px; border-left:1px dashed var(--rail); border-right:1px dashed var(--rail); -webkit-font-smoothing:antialiased; }
+  a { color:var(--fg); text-decoration:underline; text-decoration-style:dotted; text-underline-offset:3px; text-decoration-color:var(--ring); }
+  a:hover { text-decoration-style:solid; text-decoration-color:var(--fg); }
+  button, input, select { font:inherit; color:var(--fg); }
+  button { cursor:pointer; }
+  button:disabled { opacity:.5; cursor:wait; }
+  :focus-visible { outline:2px solid var(--ring); outline-offset:3px; }
+  .muted { color:var(--muted); }
+
+  /* Stepped "pixel" outline: four offset shadows leave the corners notched. */
+  /* Declared on every element so var(--px-c) resolves per element, not once on :root. */
+  * { --px-frame:0 -4px 0 0 var(--px-c, var(--line)), 0 4px 0 0 var(--px-c, var(--line)), -4px 0 0 0 var(--px-c, var(--line)), 4px 0 0 0 var(--px-c, var(--line)); }
+  .px { --px-c:var(--line); box-shadow:var(--px-frame); }
+
+  /* Header */
+  .topbar { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:20px; padding:16px 0; border-bottom:1px dashed var(--rail); margin-bottom:20px; }
+  .topbar-mid { display:flex; flex-direction:column; align-items:center; gap:8px; }
+  @media (max-width:1100px) { .topbar { display:flex; flex-wrap:wrap; justify-content:space-between; } .topbar-mid { align-items:flex-start; } }
+  .brand { margin:0; font:17.5px/1.4 var(--pixel); letter-spacing:.5px; }
+  .status { display:flex; gap:10px; flex-wrap:wrap; color:var(--muted); font:13.5px/1.8 var(--pixel); letter-spacing:.5px; }
+  .status .sep { color:var(--faint); }
+  .dot { display:inline-block; width:6px; height:6px; background:#4ade80; margin-right:6px; vertical-align:0; }
+  .theme-pick { display:flex; align-items:center; gap:8px; color:var(--muted); font:13.5px/1.4 var(--pixel); letter-spacing:.5px; }
+  .auth { justify-self:end; display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:14px; font-size:15px; }
+  .btn { white-space:nowrap; --px-c:var(--primary); background:var(--primary); color:var(--primary-fg); border:0; border-radius:0; padding:7px 14px; margin:4px; font:15px/1.4 var(--pixel); letter-spacing:.5px; transition:transform .08s; box-shadow:var(--px-frame); }
+  .btn:hover:not(:disabled) { --px-c:#ffffff; background:#ffffff; }
+  .btn:active:not(:disabled) { transform:translateY(2px); }
+
+  /* Panels: dark cards with a notched pixel border and a title strip */
+  .panel { --px-c:var(--line); position:relative; background:var(--panel); margin:4px 4px 16px; padding-bottom:16px; box-shadow:var(--px-frame); }
+  .panel-title { margin:0 0 16px; padding:14px 16px; background:var(--head); border-bottom:1px dashed var(--rail); font:14.5px/1.4 var(--pixel); letter-spacing:.5px; }
+  .panel > :not(.panel-title) { margin-left:16px; margin-right:16px; }
+  .panel > table { width:calc(100% - 32px); }
+  .col { min-width:0; }
+
+  /* Wide screens: leaderboard and contests side by side; stacked below 1000px. */
+  .layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,1fr); grid-template-areas:"left center right"; gap:12px; align-items:start; }
+  .col-left { grid-area:left; } .col-center { grid-area:center; } .col-right { grid-area:right; }
+  @media (max-width:1280px) { .layout { grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-template-areas:"center center" "left right"; } }
+  @media (max-width:760px) { .layout { grid-template-columns:1fr; grid-template-areas:"center" "left" "right"; gap:0; } }
+
+  /* Pixel tabs: active one inverted */
+  .tabs { --px-c:var(--ring); display:inline-flex; flex-wrap:wrap; gap:2px; padding:3px; margin:4px; background:var(--bg); box-shadow:var(--px-frame); }
+  .tabs button { background:none; border:0; border-radius:0; color:var(--muted); padding:7px 12px; font:14.5px/1.4 var(--pixel); letter-spacing:.5px; }
+  .tabs button:hover { color:var(--fg); }
+  .tabs button.on { background:var(--sel); color:var(--fg); cursor:default; }
+  .board-bar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+  .filters { display:flex; flex-wrap:wrap; gap:14px; margin-left:auto; }
+  .filters label { display:flex; align-items:center; gap:8px; white-space:nowrap; color:var(--muted); font:13.5px/1.4 var(--pixel); letter-spacing:.5px; }
+  select { background:var(--bg); border:2px solid var(--line); border-radius:0; padding:5px 6px; font:14.5px/1.4 var(--pixel); cursor:pointer; }
+  select:hover { border-color:var(--ring); }
+  .chart-bar { display:flex; align-items:center; gap:10px; margin-top:12px; padding-top:10px; border-top:1px dashed var(--rail); }
+  .chart-bar::before { content:"CHART"; color:var(--faint); font:13.5px/1 var(--pixel); }
+  /* Chart screen: stepped pixel frame and faint scanlines */
+  /* Next-contest countdown */
+  .countdown { margin:4px; padding:12px; text-align:center; }
+  .cd-name { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:14px; font-size:15.5px; }
+  .cd-clock { display:flex; justify-content:center; gap:10px; }
+  .cd-unit { display:grid; gap:7px; min-width:3.6em; }
+  .cd-unit b { --px-c:var(--line); display:block; margin:4px; padding:10px 0 8px; background:var(--track); box-shadow:var(--px-frame); font:clamp(14px, 2.2vw, 20px)/1 var(--pixel); color:var(--fg); }
+  .cd-unit span { color:var(--faint); font:11px/1 var(--pixel); letter-spacing:.5px; }
+  .cd-unit.soon b { color:var(--hot); }
+  .cd-meta { margin-top:14px; color:var(--muted); font-size:14.5px; }
+  .cd-meta a { margin-left:8px; }
+
+  /* Solve heatmap: one row of day squares per player */
+  .heatmap { display:grid; gap:10px; min-width:0; }
+  .heatmap > * { min-width:0; }
+  .hm-row h4 { display:flex; align-items:center; justify-content:space-between; margin:0 0 6px; font:13.5px/1.4 var(--pixel); }
+  .hm-row h4 span { color:var(--faint); font-size:11.5px; }
+  .hm-grid { display:grid; grid-auto-flow:column; grid-template-rows:repeat(7, 11px); grid-auto-columns:11px; gap:3px; overflow-x:auto; padding-bottom:2px; }
+  .hm-grid i { width:11px; height:11px; background:var(--track); }
+  .hm-grid i[data-l="1"] { background:color-mix(in srgb, var(--hm) 35%, var(--track)); }
+  .hm-grid i[data-l="2"] { background:color-mix(in srgb, var(--hm) 60%, var(--track)); }
+  .hm-grid i[data-l="3"] { background:color-mix(in srgb, var(--hm) 82%, var(--track)); }
+  .hm-grid i[data-l="4"] { background:var(--hm); }
+  .hm-grid i.future { background:transparent; }
+  .hm-foot { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; color:var(--faint); font:11.5px/1.4 var(--pixel); }
+  .hm-scale { display:flex; align-items:center; gap:3px; }
+  .hm-scale i { width:9px; height:9px; }
+  .screen { --px-c:var(--line); background:repeating-linear-gradient(0deg, rgba(255,255,255,.022) 0 1px, transparent 1px 3px), var(--bg); box-shadow:var(--px-frame); }
+  .chart-wrap { position:relative; margin:12px 4px 0; padding:12px 10px 8px; }
+  .chart-note { color:var(--faint); font-size:15px; margin:8px 0 0; }
+
+  /* Tables */
+  table { width:100%; border-collapse:collapse; margin-top:16px; font-variant-numeric:tabular-nums; }
+  th { text-align:left; font:13px/1.4 var(--pixel); letter-spacing:.5px; text-transform:uppercase; color:var(--faint); padding:10px 10px; border-bottom:2px solid var(--line); }
+  td { padding:9px 10px; border-bottom:1px dashed var(--line); }
+  tbody tr:hover td { background:var(--hover); }
+  th.n, td.n { text-align:right; width:6em; } th.rank, td.rank { width:3.5em; }
+  td.n { font-family:var(--chart-font); font-size:15.5px; }
+  td.rank { color:var(--faint); font:15px/1 var(--pixel); }
+  tr.first td.rank { color:var(--gold); } tr.second td.rank { color:#c0c6cf; } tr.third td.rank { color:#c98a55; }
+  td.empty { color:var(--faint); text-align:center; padding:20px; font:13.5px/1.6 var(--pixel); }
+  .tag { display:inline-block; font:11.5px/1 var(--pixel); padding:4px 5px 3px; color:#0b0b0b; }
+  .tag.cf { background:var(--cf); } .tag.lc { background:var(--lc); }
+  td.when, .contest-list .when { color:var(--muted); white-space:nowrap; font-family:var(--chart-font); font-size:15px; }
+  .contest-list .when { margin-top:4px; white-space:normal; }
+  .contest-list .tagcell { width:3.2em; vertical-align:top; padding-top:11px; }
+
+  /* Profile form */
+  .profile form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)) auto; gap:16px; align-items:end; }
+  label { display:grid; gap:8px; color:var(--muted); font:13.5px/1.4 var(--pixel); letter-spacing:.5px; }
+  input { min-width:0; padding:8px 10px; margin:3px; background:var(--track); border:0; border-radius:0; font:14px/1.4 var(--pixel); letter-spacing:.5px;
+    box-shadow:0 -3px 0 0 var(--ring), 0 3px 0 0 var(--ring), -3px 0 0 0 var(--ring), 3px 0 0 0 var(--ring); }
+  input:focus { outline:none; background:var(--track-2); }
+  .profile-link { font:15px/1.4 var(--text); letter-spacing:0; }
+  .message { min-height:1.5em; margin:12px 0 0; color:var(--muted); font-size:15px; }
+
+  /* Footer */
+  .statusbar { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:8px 22px; flex-wrap:wrap;  color:var(--faint); font:13px/2 var(--pixel); letter-spacing:.5px; border-top:1px dashed var(--rail); padding-top:16px; }
+  .statusbar a { color:var(--muted); }
+  .statusbar > :nth-child(2) { text-align:center; } .statusbar > :last-child { justify-self:end; }
+  @media (max-width:900px) { .statusbar { display:flex; flex-wrap:wrap; } }
+  kbd { font:inherit; color:var(--fg); background:var(--head); padding:2px 4px; }
+
+  /* Brand + hero graphic */
+  .brand { display:flex; align-items:center; gap:10px; }
+  .brand-icon svg { display:block; }
+  .hero { display:flex; align-items:flex-end; justify-content:center; gap:clamp(16px, 5vw, 64px); padding:4px 0 16px; margin-bottom:16px; border-bottom:1px dashed var(--rail); text-align:center; }
+  .hero-center { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .hero h2 { margin:0; font:clamp(18px, 3vw, 34px)/1.5 var(--pixel); letter-spacing:1px; }
+  .hero p { margin:0; color:var(--muted); font:clamp(10px, 1.2vw, 13px)/1.8 var(--pixel); letter-spacing:.5px; }
+  .hero .side { opacity:.9; }
+  .hero .bob { animation:bob 2.4s steps(2) infinite; }
+  @keyframes bob { 50% { transform:translateY(-4px) } }
+  @media (prefers-reduced-motion:reduce) { .hero .bob, .sprite, .spin rect { animation:none !important; opacity:1 !important } }
+
+  /* Pixel avatar next to names */
+  .avatar { display:inline-block; vertical-align:-3px; margin-right:9px; image-rendering:pixelated; }
+  td.name { white-space:nowrap; }
+
+  /* 8-bit spinner: eight pixels lighting in turn */
+  .spin { display:inline-block; width:14px; height:14px; vertical-align:-2px; color:var(--fg); }
+  .spin rect { animation:spin-px .8s linear infinite; opacity:0; }
+  @keyframes spin-px { 0% { opacity:1 } 100% { opacity:0 } }
+  .loading { display:flex; align-items:center; justify-content:center; gap:10px; color:var(--faint); font:13.5px/1.6 var(--pixel); padding:18px; }
+
+  /* Segmented XP / progress bar */
+  .xp { --c:var(--primary); position:relative; height:14px; margin:3px; background:var(--track); flex:1; min-width:60px;
+    box-shadow:0 -3px 0 0 var(--line), 0 3px 0 0 var(--line), -3px 0 0 0 var(--line), 3px 0 0 0 var(--line); }
+  .xp i { position:absolute; inset:2px auto 2px 2px; width:calc((100% - 4px) * var(--p, 0)); background:repeating-linear-gradient(90deg, var(--c) 0 6px, transparent 6px 8px); transition:width .4s steps(8); }
+  .xp-sm { height:10px; min-width:70px; max-width:90px; }
+  .sync { display:flex; align-items:center; gap:8px; color:var(--faint); font:13px/1 var(--pixel); }
+
+  /* Ranks panel: player cards + legend */
+
+  .rank-cards { display:grid; gap:12px; }
+  .rank-card { margin:4px; padding:12px; }
+  .rank-card h3 { display:flex; align-items:center; margin:0 0 10px; font:15px/1.4 var(--pixel); }
+  /* Party slots: label + XP bar over a full pixel character, like an RPG party screen */
+  .party { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:18px; }
+  .hero-slot { min-width:0; }
+  .slot-head { display:flex; justify-content:space-between; gap:8px; font:13px/1.4 var(--pixel); color:var(--muted); white-space:nowrap; }
+  .slot-head b { color:var(--c); font-weight:normal; }
+  .hero-slot .xp { margin:8px 3px 10px; }
+  .slot-art { display:flex; justify-content:center; padding-top:6px; }
+  .sprite { image-rendering:pixelated; animation:bob 2.4s steps(2) infinite; }
+  .hero-slot:nth-child(2) .sprite { animation-delay:-1.2s; }
+  .hero-slot.unrated .sprite { filter:grayscale(1) brightness(.35); animation:none; }
+  .sprite-sm { image-rendering:pixelated; }
+  .legend h4 { margin:0 0 8px; font:13.5px/1.4 var(--pixel); color:var(--muted); }
+  .legend ul { list-style:none; margin:0 0 18px; padding:0; display:grid; gap:6px; }
+  .legend li { display:grid; grid-template-columns:24px 1fr auto; align-items:center; gap:8px; font-size:14.5px; }
+  .legend li span:last-child { color:var(--faint); font-family:var(--chart-font); font-size:14px; }
+  .legend p { margin:0; color:var(--faint); font-size:14px; }
+
+  /* Head-on alert: hazard-striped strip that blinks while two players are neck and neck */
+  .alert { --px-c:var(--hot); display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:0 4px 16px; padding:8px 12px; box-shadow:var(--px-frame);
+    background:repeating-linear-gradient(45deg, #2a0b0b 0 10px, #170606 10px 20px); font:14.5px/1.8 var(--pixel); letter-spacing:.5px; }
+  .alert .bang { display:inline-grid; place-items:center; width:24px; height:24px; background:var(--hot); color:#000; font:16px/1 var(--pixel); animation:blink .7s steps(2) infinite; }
+  .alert strong { color:var(--hot); font-weight:normal; animation:blink 1.4s steps(2) infinite; }
+  .alert b { color:var(--fg); font-weight:normal; }
+  .alert .btn { margin-left:auto; --px-c:var(--hot); background:var(--hot); color:#000; }
+  @keyframes blink { 50% { opacity:.25 } }
+
+  /* Duel arena */
+  .arena .panel-title { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .arena .panel-title small { color:var(--hot); font-size:13.5px; }
+  .arena-bar { display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap; }
+  .arena-bar select { min-width:12em; padding:8px; }
+  .arena-bar .btn-ghost { padding:6px 10px; }
+  .ring { position:relative; display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:end; gap:18px; margin:22px 4px 0; padding:18px 20px 0; overflow:hidden; }
+  .ring .spark { position:absolute; width:4px; height:4px; background:var(--gold); animation:blink 1.2s steps(2) infinite; }
+  .ring .spark:nth-child(3n) { background:#fff; width:2px; height:2px; }
+  .floor { grid-column:1 / -1; height:30px; margin:0 -20px; border-top:4px solid var(--line);
+    background:repeating-linear-gradient(90deg, var(--track) 0 16px, var(--row) 16px 32px); }
+  .fighter { --c:var(--fg); min-width:0; display:grid; gap:7px; position:relative; z-index:1; }
+  .fighter.right { text-align:right; }
+  .f-name { font:15px/1.4 var(--pixel); color:var(--c); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .f-name small { color:var(--muted); font-size:13.5px; margin:0 8px; }
+  .f-tier { font:13px/1.4 var(--pixel); }
+  .bar-row { display:flex; justify-content:space-between; font:11.5px/1.4 var(--pixel); color:var(--muted); margin-top:4px; }
+  .xp .lbl { position:absolute; inset:0; display:grid; place-items:center; font:11.5px/1 var(--pixel); color:#fff;
+    text-shadow:1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000; }
+  .xp.hp { --c:#ff4d4d; } .xp.gold { --c:#d4a72c; }
+  .fighter.right .xp i { inset:2px 2px 2px auto; }
+  .f-art { display:flex; justify-content:center; padding-top:10px; }
+  .f-art svg { width:clamp(84px, 16vw, 132px); height:auto; }
+  .fighter.right .f-art .flip { transform:scaleX(-1); }
+  .fighter.left .f-art { animation:enter-l .5s steps(5) both; }
+  .fighter.right .f-art { animation:enter-r .5s steps(5) both; }
+  .fighter.unrated .sprite { filter:grayscale(1) brightness(.35); animation:none; }
+  @keyframes enter-l { from { transform:translateX(-80px) } }
+  @keyframes enter-r { from { transform:translateX(80px) } }
+  .vs { display:grid; justify-items:center; gap:14px; align-self:center; padding-bottom:30px; position:relative; z-index:1; }
+  .vs-text { font:clamp(28px, 5vw, 46px)/1 var(--pixel); color:var(--gold); text-shadow:4px 4px 0 #8f1414, 8px 8px 0 #000; animation:vs-pop .6s steps(3) both; }
+  @keyframes vs-pop { from { transform:scale(2.6) } }
+  .verdict { --px-c:var(--ring); max-width:15em; padding:8px 10px; margin:4px; background:var(--head); box-shadow:var(--px-frame); font:13.5px/1.7 var(--pixel); text-align:center; }
+  .verdict.hot { --px-c:#ffd34d; background:var(--hot); color:#000; animation:shake .3s steps(2) infinite; }
+  .verdict.win { --px-c:var(--gold); color:var(--gold); }
+  @keyframes shake { 50% { transform:translate(2px, -1px) rotate(-1.5deg) } }
+  .tug { display:grid; gap:12px; margin:24px 4px 0; }
+  .tug-head { display:flex; justify-content:center; gap:18px; font:15px/1.4 var(--pixel); color:var(--muted); }
+  .tug-head b { color:var(--gold); font-weight:normal; }
+  .tug-row { display:grid; grid-template-columns:8em minmax(0,1fr) 8em minmax(0,1fr) 8em; align-items:center; gap:10px; font:13.5px/1.4 var(--pixel); white-space:nowrap; }
+  .tug-row .v { color:var(--muted); } .tug-row .v:last-child { text-align:right; }
+  .tug-row .v.won { color:var(--gold); } .tug-row .v svg { vertical-align:-1px; margin:0 6px; }
+  .tug-row .lab { text-align:center; color:var(--faint); font-size:11.5px; }
+  .tug-bar { position:relative; height:12px; background:var(--track); }
+  .tug-bar i { position:absolute; top:2px; bottom:2px; width:calc((100% - 4px) * var(--p, 0)); background:repeating-linear-gradient(90deg, var(--c) 0 6px, transparent 6px 8px); transition:width .4s steps(8); }
+  .tug-bar.l i { right:2px; } .tug-bar.r i { left:2px; }
+  .dialog { display:grid; gap:14px; margin:26px 4px 0; }
+  .say { display:flex; gap:12px; align-items:flex-start; }
+  .say.r { flex-direction:row-reverse; text-align:right; }
+  .say .pic { --px-c:var(--c); flex:none; margin:4px; padding:4px; background:var(--bg); box-shadow:var(--px-frame); }
+  .say .pic svg { display:block; margin:0; }
+  .bubble { --px-c:var(--ring); margin:4px; padding:10px 14px; background:var(--bg); box-shadow:var(--px-frame); font:13.5px/2 var(--pixel); max-width:38em; }
+  .bubble b { display:block; color:var(--c); font-weight:normal; }
+  .say:last-child .bubble::after { content:""; display:inline-block; width:6px; height:9px; margin-left:6px; vertical-align:-1px; background:currentColor; animation:blink .8s steps(2) infinite; }
+  .duel-chart { position:relative; height:230px; margin:26px 4px 0; padding:14px 12px 10px; }
+  @media (prefers-reduced-motion:reduce) { .alert *, .ring *, .vs-text, .verdict, .f-art, .bubble::after { animation:none !important; opacity:1 !important; } }
+  @media (max-width:600px) {
+    .ring { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; padding:14px 10px 0; } .floor { margin:0 -10px; }
+    .vs { grid-column:1 / -1; order:-1; grid-auto-flow:column; align-items:center; gap:16px; padding-bottom:4px; }
+    .vs-text { font-size:26px; } .verdict { font-size:11.5px; max-width:none; }
+    .f-name { font-size:15px; } .f-art svg { width:84px; }
+    .tug-row { grid-template-columns:7em minmax(0,1fr) minmax(0,1fr) 7em; gap:4px 6px; font-size:11.5px; }
+    .tug-row .lab { grid-column:1 / -1; order:-1; }
+    .tug-head { gap:10px; font-size:13px; }
+  }
+
+  /* Calendar (8-bit Calendar component look) */
+  .calendar { margin:4px 4px 0; padding:12px; }
+  .cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; font:15px/1 var(--pixel); }
+  .cal-nav { width:22px; height:22px; padding:0; background:none; border:2px solid var(--ring); color:var(--fg); font:15px/1 var(--pixel); }
+  .cal-nav:hover { background:var(--head); }
+  .cal-grid { display:grid; grid-template-columns:repeat(7, 1fr); gap:2px; text-align:center; }
+  .cal-grid .dow { color:var(--faint); font:11.5px/2.4 var(--pixel); }
+  .cal-cell { position:relative; aspect-ratio:1.15; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; background:none; border:0; padding:0; color:var(--fg); font:15px/1 var(--pixel); }
+  .cal-cell.out { color:var(--faint); opacity:.5; }
+  .cal-cell.today { background:var(--primary); color:var(--primary-fg); }
+  .cal-cell.has { cursor:pointer; } .cal-cell.has:hover { background:var(--head); } .cal-cell.today.has:hover { background:#fff; }
+  .cal-cell.sel { outline:2px solid var(--ring); outline-offset:-2px; }
+  .marks { display:flex; gap:3px; height:5px; }
+  .marks b { width:5px; height:5px; } .marks .cf { background:var(--cf); } .marks .lc { background:var(--lc); }
+  .cal-legend { display:flex; gap:14px; margin-top:12px; color:var(--faint); font:11.5px/1 var(--pixel); }
+  .cal-legend b { display:inline-block; width:7px; height:7px; margin-right:6px; vertical-align:-1px; }
+  .cal-day { margin-top:14px; font-size:15px; }
+  .cal-day h4 { margin:0 0 6px; font:13.5px/1.4 var(--pixel); color:var(--muted); }
+  .cal-day ul { list-style:none; margin:0; padding:0; display:grid; gap:6px; }
+  .cal-day li { display:flex; gap:8px; align-items:center; }
+  .cal-day time { color:var(--faint); font-family:var(--chart-font); font-size:14.5px; }
+
+  /* Sign-in dialog (8-bit card) */
+  dialog.signin { padding:0; border:0; background:transparent; color:var(--fg); max-width:min(380px, calc(100vw - 32px)); width:100%; overflow:visible; }
+  dialog.signin::backdrop { background:rgba(0,0,0,.75); }
+  .dlg { --px-c:var(--ring); margin:6px; padding:20px; background:var(--panel); box-shadow:var(--px-frame); }
+  .dlg-head { display:flex; justify-content:space-between; align-items:center; }
+  .dlg-head h2 { margin:0; font:16px/1.4 var(--pixel); }
+  .dlg-sub { margin:10px 0 18px; color:var(--muted); font:13.5px/1.9 var(--pixel); }
+  .x { background:none; border:0; color:var(--muted); font:18px/1 var(--pixel); padding:0 4px; }
+  .x:hover { color:var(--fg); }
+  .oauth { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .btn-ghost { --px-c:var(--ring); background:transparent; color:var(--fg); }
+  .btn-ghost:hover:not(:disabled) { --px-c:var(--fg); background:var(--head); }
+  .or { display:flex; align-items:center; gap:10px; margin:18px 0; color:var(--faint); font:11.5px/1 var(--pixel); }
+  .or::before, .or::after { content:""; flex:1; border-top:1px dashed var(--line); }
+  .signin form { display:grid; gap:14px; }
+  .signin label { color:var(--fg); font-size:14.5px; }
+  .signin label span { color:var(--muted); }
+  .dlg-row { display:flex; align-items:center; gap:14px; }
+  .linkbtn { background:none; border:0; padding:0; color:var(--muted); font:13px/1.4 var(--pixel); text-decoration:underline dotted; text-underline-offset:3px; }
+  .linkbtn:hover { color:var(--fg); }
+  .btn .spin { color:inherit; margin-right:8px; width:10px; height:10px; }
+  #clerk-captcha:empty { display:none; }
+
+  /* Private groups share the dashboard's pixel frames and theme tokens. */
+  .dashboard-nav { display:flex; align-items:end; justify-content:space-between; gap:16px; margin:22px 6px; }
+  .dashboard-nav label { display:grid; gap:10px; min-width:0; flex:1; max-width:480px; }
+  .dashboard-nav select { width:100%; min-width:0; }
+  .text-button { padding:6px 0; border:0; background:none; color:var(--muted); font:12px/1.6 var(--pixel); text-decoration:underline dotted; cursor:pointer; }
+  .text-button:hover { color:var(--fg); }
+  .group-tools summary, .members summary, .profile summary { cursor:pointer; font:13px/1.7 var(--pixel); }
+  .group-tools p, .group-overview p { margin:12px 0; line-height:1.6; }
   .group-forms { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:16px; }
-  .group-forms form { display:grid; gap:8px; align-content:start; }
-  .dashboard-title { margin-bottom:4px; overflow-wrap:anywhere; }
-  .summary { display:flex; flex-wrap:wrap; gap:12px 24px; padding:16px 0; }
-  .summary strong { display:block; font-size:24px; font-variant-numeric:tabular-nums; }
-  .group-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+  .group-forms form { display:grid; gap:12px; align-content:start; }
+  .dashboard-title { margin:0 0 12px; font:16px/1.8 var(--pixel); overflow-wrap:anywhere; }
+  .summary { display:flex; flex-wrap:wrap; gap:16px 32px; padding:16px 0; }
+  .summary strong { display:block; margin-bottom:8px; font:22px/1.4 var(--pixel); }
+  .group-actions { display:flex; flex-wrap:wrap; gap:16px; margin:16px 0; }
   .invite-link { width:100%; box-sizing:border-box; }
   .member-list { list-style:none; padding:0; }
-  .member-list li { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
-  .invite-notice { padding:12px; border-left:3px solid var(--accent); margin-top:20px; }
-  .invite-notice p { margin:0; }
-  button:disabled { opacity:.55; cursor:wait }
-  .message { min-height:1.5em; margin:8px 0 0; color:var(--muted); font-size:13px; }
-  table { width:100%; border-collapse:collapse; margin:12px 0 32px } th,td { text-align:left; padding:8px; border-bottom:1px solid var(--line) }
-  td.n { text-align:right; font-variant-numeric:tabular-nums } a { color:var(--accent) }
-  @media (max-width:600px) { .profile form, .group-forms { grid-template-columns:1fr; } table { font-size:13px; } th,td { padding:7px 5px; } }
+  .member-list li { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px dashed var(--rail); overflow-wrap:anywhere; }
+  .invite-notice { border-left:3px solid var(--primary); padding:12px; margin:16px 6px; }
+  .invite-notice p { margin:0 0 8px; }
+  #group-message { margin:8px 6px 16px; }
+  #profile form { margin-top:18px; }
+  .awaiting-stats { display:block; color:var(--muted); font:11px/1.5 var(--text); margin-top:4px; }
+  @media(max-width:600px) {
+    .group-forms { grid-template-columns:1fr; }
+    .dashboard-nav { gap:10px; }
+    .dashboard-nav select { font-size:11px; }
+    .dashboard-nav .text-button { font-size:9px; }
+    .member-list li { align-items:flex-start; flex-wrap:wrap; }
+  }
+
+
+  @media (max-width:600px) {
+    /* Phones: keep the 6-column leaderboard inside the screen at the larger type size. */
+    th { font-size:8.5px; letter-spacing:0; }
+    .col-center th, .col-center td { padding-left:4px; padding-right:4px; }
+    th.n, td.n { width:auto; } th.rank, td.rank { width:2.4em; }
+    td.n { font-size:12.5px; }
+    td.name .avatar { margin-right:5px; }
+    td.name { white-space:normal; }
+    .ring { overflow:hidden; }
+    .auth { justify-content:flex-start; }
+    .hero .side { display:none; }
+    .sync { display:none; }
+    .party { gap:12px; } .slot-head { flex-direction:column; gap:4px; }
+    .profile form { grid-template-columns:1fr; }
+    .auth { margin-left:0; }
+    th, td { padding:8px 5px; } td { font-size:15px; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <div><h1>CP Leaderboard</h1><div class="muted" id="updated">Connecting...</div></div>
-  <div class="muted" id="auth-status" aria-live="polite"></div>
-</header>
-<section class="auth" aria-label="Account">
-  <button class="action" id="google-login">Continue with Google</button>
-  <button class="action" id="github-login">Continue with GitHub</button>
-  <div class="email-address" id="email-address">
-    <input id="email" type="text" maxlength="30" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="yourname" aria-label="Gmail username">
-    <span aria-hidden="true">@gmail.com</span>
+<header class="topbar">
+  <h1 class="brand"><span id="brand-icon" class="brand-icon"></span>cp-leaderboard</h1>
+  <div class="topbar-mid">
+    <div class="status">
+      <span><span class="dot" aria-hidden="true"></span><span id="updated">Connecting…</span></span>
+      <span class="sep">·</span><span id="user-count">– users</span>
+    </div>
+    <div class="sync" title="Stats refresh every 6 hours (GitHub Actions may start a few minutes late)">
+      <span>Next sync</span><div class="xp xp-sm" id="sync-bar"><i></i></div><span id="sync-left">–</span>
+    </div>
   </div>
-  <button class="action" id="email-login">Send link</button>
-  <button class="action" id="logout" hidden>Log out</button>
-</section>
-<details class="profile" id="profile" hidden>
-  <summary>My profile and handles</summary>
-  <form id="profile-form">
-    <label>Name<input id="name" required minlength="2" maxlength="32" autocomplete="nickname"></label>
-    <label>Codeforces handle<input id="codeforces" maxlength="200" autocomplete="off" placeholder="Handle or profile URL"><a class="profile-link" id="codeforces-link" target="_blank" rel="noopener noreferrer" hidden>Open Codeforces profile</a></label>
-    <label>LeetCode username<input id="leetcode" maxlength="200" autocomplete="off" placeholder="Username or profile URL"><a class="profile-link" id="leetcode-link" target="_blank" rel="noopener noreferrer" hidden>Open LeetCode profile</a></label>
-    <button class="action" id="save-profile" type="submit">Save profile</button>
-  </form>
-  <p class="message" id="profile-message" aria-live="polite"></p>
-</details>
+  <div class="auth" aria-label="Account">
+    <label class="theme-pick">Theme<select id="theme" aria-label="Theme"></select></label>
+    <span class="muted" id="auth-status" aria-live="polite"></span>
+    <button class="btn" id="login" disabled>Sign in</button>
+    <button class="btn" id="logout" hidden>Log out</button>
+  </div>
+</header>
 <div class="invite-notice" id="invite-notice" hidden>
   <p id="invite-notice-text"></p>
   <button class="text-button" id="dismiss-invite" type="button">Dismiss invitation</button>
@@ -83,21 +491,22 @@
   <label>My groups<select id="dashboard-select" aria-label="Choose a group dashboard"><option value="">Sign in to use groups</option></select></label>
   <button class="text-button" id="global-rankings" type="button">Global rankings</button>
 </nav>
-<details class="group-tools" id="group-tools">
+<details class="panel group-tools" id="group-tools">
   <summary>Create or join a group</summary>
   <p class="muted" id="group-help">Sign in and save your profile to create or join an invitation-only group. Individual scores remain visible in global rankings.</p>
   <div class="group-forms">
     <form id="create-group-form">
       <label>New group name<input id="group-name" required minlength="2" maxlength="60" placeholder="Friends, class, or coding club"></label>
-      <button class="action" id="create-group" type="submit" disabled>Create group</button>
+      <button class="btn btn-ghost" id="create-group" type="submit" disabled>Create group</button>
     </form>
     <form id="join-group-form">
       <label>Invitation link or code<input id="invite-code" required maxlength="512" autocomplete="off" spellcheck="false" placeholder="Paste an invitation"></label>
-      <button class="action" id="join-group" type="submit" disabled>Join group</button>
+      <button class="btn btn-ghost" id="join-group" type="submit" disabled>Join group</button>
     </form>
   </div>
 </details>
 <p class="message" id="group-message" role="status"></p>
+<section class="panel group-overview">
 <h2 class="dashboard-title" id="dashboard-title">Global rankings</h2>
 <p class="muted" id="dashboard-description">Everyone on CP Leaderboard.</p>
 <div id="group-dashboard" hidden>
@@ -112,33 +521,488 @@
     <div id="owner-tools" hidden>
       <p class="muted">Anyone with your invitation can join. Replace the invitation to disable the old link. Existing members keep access.</p>
       <div class="group-actions">
-        <button class="action" id="copy-invite" type="button">Copy invitation</button>
-        <button class="action" id="rotate-invite" type="button">Replace invitation</button>
-        <button class="action" id="delete-group" type="button">Delete group</button>
+        <button class="btn btn-ghost" id="copy-invite" type="button">Copy invitation</button>
+        <button class="btn btn-ghost" id="rotate-invite" type="button">Replace invitation</button>
+        <button class="btn btn-ghost" id="delete-group" type="button">Delete group</button>
       </div>
       <label id="invite-link-label" hidden>Invitation link<input class="invite-link" id="invite-link" readonly></label>
     </div>
-    <button class="action" id="leave-group" type="button" hidden>Leave group</button>
+    <button class="btn btn-ghost" id="leave-group" type="button" hidden>Leave group</button>
   </details>
 </div>
-<div class="tabs" id="tabs"></div>
-<table><thead><tr><th>#</th><th>Name</th><th>Points</th><th>Solved</th><th>CF</th><th>LC</th></tr></thead><tbody id="board"></tbody></table>
-<h2>Upcoming contests</h2>
-<table><tbody id="contests"></tbody></table>
+</section>
+<div class="alert" id="alert" role="status" hidden></div>
+<section class="hero" id="hero" aria-label="CP Leaderboard"></section>
+<section class="panel arena" id="arena" hidden>
+  <h2 class="panel-title"><span>Duel Arena</span><small id="arena-round"></small></h2>
+  <div class="arena-bar">
+    <select id="duel-a" aria-label="Left fighter"></select>
+    <button class="btn btn-ghost" id="duel-swap" title="Swap sides">Swap</button>
+    <select id="duel-b" aria-label="Right fighter"></select>
+    <button class="btn" id="duel-shuffle">Random duel</button>
+  </div>
+  <div class="ring screen" id="ring"></div>
+  <div class="tug" id="tug"></div>
+  <div class="dialog" id="dialog"></div>
+  <div class="duel-chart screen" id="duel-chart-wrap"><canvas id="duel-chart" aria-label="Duel progress chart"></canvas></div>
+  <p class="chart-note" id="duel-note" hidden></p>
+</section>
+<details class="panel profile" id="profile" hidden>
+  <summary class="panel-title">My profile and handles</summary>
+  <form id="profile-form">
+    <label>Name<input id="name" required minlength="2" maxlength="32" autocomplete="nickname"></label>
+    <label>Codeforces<input id="codeforces" maxlength="200" autocomplete="off" placeholder="handle or profile URL"><a class="profile-link" id="codeforces-link" target="_blank" rel="noopener noreferrer" hidden>Open profile ↗</a></label>
+    <label>LeetCode<input id="leetcode" maxlength="200" autocomplete="off" placeholder="username or profile URL"><a class="profile-link" id="leetcode-link" target="_blank" rel="noopener noreferrer" hidden>Open profile ↗</a></label>
+    <button class="btn" id="save-profile" type="submit">Save</button>
+  </form>
+  <p class="message" id="profile-message" aria-live="polite"></p>
+</details>
+<main class="layout">
+<div class="col col-left">
+<section class="panel">
+<h2 class="panel-title">Next contest</h2>
+<div class="countdown screen" id="countdown"></div>
+</section>
+<section class="panel">
+<h2 class="panel-title">Contest calendar</h2>
+<div class="calendar screen" id="calendar"></div>
+<div class="cal-day" id="cal-day"></div>
+</section>
+<section class="panel">
+<h2 class="panel-title">Upcoming contests</h2>
+<table class="contest-list"><tbody id="contests"></tbody></table>
+</section>
+</div>
+<div class="col col-center">
+<section class="panel">
+<h2 class="panel-title">Leaderboard</h2>
+<div class="board-bar">
+  <div class="tabs" id="tabs"></div>
+  <div class="filters">
+    <label>Platform:
+      <select id="platform">
+        <option value="all">All</option>
+        <option value="lc">LeetCode</option>
+        <option value="cf">Codeforces</option>
+      </select>
+    </label>
+    <label>Sort:
+      <select id="sort">
+        <option value="points">Score</option>
+        <option value="solved">Solved</option>
+        <option value="rating">Rating</option>
+      </select>
+    </label>
+  </div>
+</div>
+<div class="chart-bar">
+  <div class="tabs chart-toggle" id="chart-view">
+    <button data-v="standings" class="on">Standings</button><button data-v="progress">Progress</button>
+  </div>
+</div>
+<div class="chart-wrap screen" id="chart-wrap"><canvas id="chart" aria-label="Leaderboard chart"></canvas></div>
+<p class="chart-note" id="chart-note" hidden></p>
+<table><thead><tr><th class="rank">#</th><th>Name</th><th class="n">Points</th><th class="n">Solved</th><th class="n" id="cf-head">CF</th><th class="n" id="lc-head">LC</th></tr></thead><tbody id="board"></tbody></table>
+</section>
+<section class="panel">
+<h2 class="panel-title">Ranks</h2>
+<div class="rank-cards" id="ranks"></div>
+</section>
+</div>
+<div class="col col-right">
+<section class="panel">
+<h2 class="panel-title">Rank legend</h2>
+<aside class="legend" id="legend" aria-label="Rank legend"></aside>
+</section>
+<section class="panel">
+<h2 class="panel-title">Solve heatmap</h2>
+<div class="heatmap" id="heatmap"></div>
+</section>
+</div>
+</main>
+<footer class="statusbar">
+  <span>Scoring: CF rating/100 · LC 5/10/20</span>
+  <span>Keys: <kbd>w</kbd> <kbd>b</kbd> <kbd>m</kbd> <kbd>a</kbd> period · <kbd>s</kbd> <kbd>p</kbd> chart · <kbd>d</kbd> duel · <kbd>t</kbd> theme</span>
+  <span><a href="https://github.com/ChandanYdv0402/cp-leaderboard" target="_blank" rel="noopener noreferrer">Source ↗</a></span>
+</footer>
+<dialog class="signin" id="signin-dialog" aria-labelledby="signin-title">
+  <div class="dlg">
+    <div class="dlg-head"><h2 id="signin-title">Sign in</h2><button class="x" id="signin-close" aria-label="Close">×</button></div>
+    <p class="dlg-sub" id="si-sub">Join the board. New emails get an account automatically.</p>
+    <div class="oauth">
+      <button class="btn btn-ghost" data-oauth="oauth_google">Google</button>
+      <button class="btn btn-ghost" data-oauth="oauth_github">GitHub</button>
+    </div>
+    <div class="or"><span>or</span></div>
+    <form id="email-form">
+      <label>Email<input id="si-email" type="email" required autocomplete="email" placeholder="you@example.com"></label>
+      <button class="btn" type="submit">Send code</button>
+    </form>
+    <form id="code-form" hidden>
+      <label>Code sent to <span id="si-sent"></span><input id="si-code" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" required></label>
+      <label id="si-pass-wrap" hidden>Password<input id="si-pass" type="password" autocomplete="new-password" minlength="8"></label>
+      <div class="dlg-row"><button class="btn" type="submit">Verify</button><button type="button" class="linkbtn" id="si-back">Use another email</button></div>
+    </form>
+    <p class="message" id="si-msg" aria-live="polite"></p>
+    <div id="clerk-captcha"></div>
+  </div>
+</dialog>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 const SUPABASE_URL = "https://ttcbdfmwsywdgjcwsllf.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_I1p51wV_1GUVghTpsFbY5g_ex5cEJL7";
-const GOOGLE_AUTH_ENABLED = true;
-const GITHUB_AUTH_ENABLED = false;
+// Clerk publishable key (pk_test_... / pk_live_...) — public, safe to commit. Login providers are chosen in the Clerk dashboard.
+const CLERK_PUBLISHABLE_KEY = "pk_test_dHJ1ZS1qYXktNjE1Ny5jbGVyay5hY2NvdW50cy5kZXYk";
+const CLERK_JS_URL = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js";
+// New sign-ups are closed: only existing players can sign in. Flip to true (and see
+// supabase/close_registration.sql) to let new people join again.
+const REGISTRATION_OPEN = false;
 const PERIODS = { week: "Weekly", biweek: "Bi-weekly", month: "Monthly", all: "All-time" };
 const esc = s => String(s ?? "–").replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
 const configured = !SUPABASE_URL.includes("YOUR_PROJECT") && !SUPABASE_ANON_KEY.includes("YOUR_SUPABASE");
-const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const clerkConfigured = !CLERK_PUBLISHABLE_KEY.startsWith("YOUR_");
+let clerk = null;
+// Supabase third-party auth: every request carries the Clerk session token (or none when logged out).
+const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  accessToken: async () => (await clerk?.session?.getToken()) ?? null
+}) : null;
 const $ = id => document.getElementById(id);
 const setMessage = (id, text) => { $(id).textContent = text; };
 const showError = (id, error) => setMessage(id, error?.message || "Something went wrong.");
+
+// ---------- 8-bit graphics ----------
+// Pixel art from character maps: each character is one pixel, looked up in `colors` (missing = transparent).
+function pixelArt(rows, colors, size, cls = "") {
+  const w = Math.max(...rows.map(r => r.length)), h = rows.length;
+  let rects = "";
+  rows.forEach((row, y) => [...row].forEach((ch, x) => {
+    if (colors[ch]) rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${colors[ch]}"/>`;
+  }));
+  return `<svg class="${cls}" viewBox="0 0 ${w} ${h}" width="${w * size}" height="${h * size}" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
+}
+const TROPHY = [
+  "  YYYYYYYYYY  ",
+  "YYYWYYYYYYYYYY",
+  "Y YWYYYYYYYY Y",
+  "Y YWYYYYYYYD Y",
+  " YYWYYYYYYDYY ",
+  "   YWYYYYDY   ",
+  "    YYYYDY    ",
+  "     YYYY     ",
+  "      DD      ",
+  "      DD      ",
+  "     OOOO     ",
+  "    OOOOOO    ",
+  "   BBBBBBBB   ",
+  "   BLLLLLLB   ",
+];
+const TROPHY_COLORS = { Y: "#d4b33a", W: "#fff1a8", D: "#a8862a", O: "#8a6d1f", B: "#3a3a3a", L: "#6b6b6b" };
+
+// ---------- RPG party sprites ----------
+// 24x32 characters stacked from layers (cape, body, head gear, weapon, fist, shield); each tier picks parts and colors.
+const SPRITE_W = 24, SPRITE_H = 32;
+const part = (y, ...rows) => ({ y, rows });
+const repeat = (row, n) => Array(n).fill(row);
+const BODY = part(6,
+  "         kkkkkk",
+  "        kffffffk",
+  "        kfssssfk",
+  "        ksessesk",
+  "        kssssssk",
+  "        kSssssSk",
+  "         kSSSSk",
+  "       kkkkSSkkkk",
+  "      kaaaaaaaaaak",
+  "     kaahaaaaaaAAak",
+  "     kahhaaaaaaaAak",
+  "     kahaaaaaaaaAak",
+  "     kahaaaaaaaaAak",
+  "     kakttttttttkak",
+  "     kakaaaaaaaakak",
+  "     kskaaaaaaaaksk",
+  "      kkaaaaaaaakk",
+  ...repeat("       kLLLkkLLLk", 4),
+  "       kbbbkkbbbk",
+  "      kbbbbkkbbbbk",
+  "      kkkkkkkkkkkk",
+  "",
+  "     oooooooooooooo");
+const FIST = part(20, "    kk", "   ksss", "    kk");
+const GEAR = {
+  plume: part(2, "             pp", "            ppP", "           ppP", "         kppPPk"),
+  helm: part(6,
+    "        kmmmmmmk",
+    "       kmwmmmmmMk",
+    "       kmwmmmmmMk",
+    "       kmkkkkkkMk",
+    "       kmmmkkmmMk",
+    "       kmmmmmmmMk",
+    "        kMMMMMMk"),
+  wings: part(5, "     w            w", "    ww            ww", "    www          www", "     ww          ww"),
+  hood: part(5,
+    "         kkkkkk",
+    "        kcccccck",
+    "       kcccccccck",
+    "       kcCssssCck",
+    ...repeat("       kcC    Cck", 3),
+    "        kcc  cck",
+    "       kccc  ccck"),
+  mask: part(11, "         CCCCCC"),
+  cap: part(5, "         kkkkkk", "        kbbbbbbk", "       kbbbbbbbbk", "       kkkkkkkkkk"),
+  wizardHat: part(0,
+    "              kk",
+    "            kkcck",
+    "           kcccck",
+    "          kccgcck",
+    "         kcccccCk",
+    "        kccccccCCk",
+    "      kkttttttttttkk",
+    "    kcccccccccccccccck",
+    "     kkkkkkkkkkkkkkkk"),
+  beard: part(10, "        kffssffk", "        kffffffk", "        kffffffk", "         kffffk", "          kffk", "           kk"),
+  hornHelm: part(3,
+    "     n            n",
+    "     nn          nn",
+    "      nn kkkkkk nn",
+    "       nkmmmmmmkn",
+    "       kmwmmmmmMk",
+    "       kmmmmmmmMk",
+    "       kmk    kMk",
+    "       kmm    mMk",
+    "       kmmmkkmmMk",
+    "        kMMMMMMk"),
+  crown: part(3, "        t  gg  t", "        tt tt tt", "        tgttttgt", "        kTTTTTTk"),
+  cape: part(13,
+    "      kcccccccccck",
+    "    kcccccccccccccck",
+    ...repeat("   kcccccccccccccccck", 8),
+    ...repeat("  kCcccccccccccccccccCk", 5),
+    "  kCCCCCCCCCCCCCCCCCCk",
+    "  kkkkkkkkkkkkkkkkkkkk"),
+  shield: part(15,
+    "                kkkkkk",
+    "               kmzzzzmk",
+    "               kzzggzzk",
+    "               kzggggzk",
+    "               kzzggzzk",
+    "               kzzggzzk",
+    "                kzzzzk",
+    "                 kzzk",
+    "                  kk"),
+  stick: part(14, "    b", ...repeat("    B", 14)),
+  bow: part(12, " B", " MB", " M B", " M B", ...repeat(" M  B", 11), " M B", " M B", " MB", " B"),
+  dagger: part(14, "    w", ...repeat("   wm", 4), "  tttt", "    B", "    B", "    B", "    t"),
+  sword: part(6, "    w", ...repeat("   wm", 11), "   wM", "  tttt", "    B", "    B", "    B", "    t"),
+  greatsword: part(1, "   w", ...repeat("  wmM", 16), "  wMM", " tgtgt", "    B", "    B", "    B", "    g", "    t"),
+  staff: part(0, "  w   w", "   kgk", "   gwg", "   kgk", ...repeat("    B", 26)),
+  hammer: part(5, " kkkkkkk", ...repeat(" kwmmmMk", 3), " kkkkkkk", ...repeat("    B", 18)),
+  axe: part(3, "    b", "  kkB", " kwmB", ...repeat("kwmmB", 5), " kwmB", "  kkB", ...repeat("    B", 16)),
+  doubleAxe: part(3, "    b", "  kkBkk", " kwmBmwk", ...repeat("kwmmBmwk", 5), " kwmBmwk", "  kkBkk", ...repeat("    B", 16)),
+};
+const BASE_COLORS = {
+  k: "#0b0b0b", s: "#f1c27d", S: "#c98e55", e: "#1b1b1b", f: "#6b4423", a: "#8d8d8d", A: "#5f5f5f", h: "#b8b8b8",
+  t: "#8b5a2b", T: "#a8862a", L: "#4a3a2a", b: "#6b4423", B: "#8b5a2b", m: "#c9ccd1", M: "#7c828c", w: "#ffffff",
+  c: "#555555", C: "#333333", z: "#6b8cff", g: "#ffd34d", n: "#e8dcc0", p: "#d33a3a", P: "#922222", o: "#000000",
+};
+// Layers are listed back to front; a weapon also gets the fist drawn over its grip.
+const HERO = (layers, colors) => ({ layers, colors });
+const SPRITES = {
+  // Codeforces
+  "Newbie": HERO(["stick"], {}),
+  "Pupil": HERO(["hood", "bow"], { a: "#6abf69", A: "#3f8f4a", h: "#9be09a", c: "#3f8f4a", C: "#2b6634", L: "#3b4a2a" }),
+  "Specialist": HERO(["hood", "mask", "dagger"], { a: "#4fc3c3", A: "#2a8a8a", h: "#8ae6e6", c: "#2f6f7a", C: "#1f4a52", L: "#22343a", t: "#1f4a52" }),
+  "Expert": HERO(["helm", "plume", "sword", "shield"], { a: "#6b8cff", A: "#4562c9", h: "#a8bbff", z: "#6b8cff", p: "#6b8cff", P: "#4562c9", L: "#5a5f6a", b: "#3a3f4a", t: "#c9ccd1" }),
+  "Candidate Master": HERO(["wizardHat", "beard", "staff"], { a: "#b36bff", A: "#7a3fc9", h: "#d3a8ff", c: "#7a3fc9", C: "#55288f", t: "#ffd34d", f: "#e6e6e6", L: "#7a3fc9", b: "#3a2a4a" }),
+  "Master": HERO(["helm", "plume", "hammer", "shield"], { a: "#ffb347", A: "#c97f1f", h: "#ffd699", z: "#ffb347", g: "#fff1a8", p: "#ffb347", P: "#c97f1f", t: "#ffd34d", L: "#5a4a3a" }),
+  "Intl. Master": HERO(["cape", "helm", "plume", "hammer", "shield"], { a: "#ff9f1a", A: "#c9700a", h: "#ffc870", z: "#ff9f1a", g: "#fff1a8", p: "#ffffff", P: "#c9c9c9", c: "#c94a1f", C: "#8f3214", t: "#ffd34d", L: "#5a4a3a" }),
+  "Grandmaster": HERO(["hornHelm", "axe"], { a: "#ff6b6b", A: "#c94040", h: "#ff9f9f", m: "#8a8f99", M: "#4f545c", e: "#ff3b3b", L: "#4a2a2a", t: "#2a2a2a" }),
+  "Intl. Grandmaster": HERO(["cape", "hornHelm", "doubleAxe"], { a: "#ff4040", A: "#b82020", h: "#ff8a8a", m: "#8a8f99", M: "#4f545c", e: "#ff3b3b", c: "#8f1414", C: "#5c0b0b", L: "#4a2a2a", t: "#2a2a2a" }),
+  "Legendary GM": HERO(["cape", "crown", "greatsword", "shield"], { a: "#ff1f1f", A: "#a80f0f", h: "#ff7a7a", f: "#2a2a2a", c: "#5c0b0b", C: "#3a0505", t: "#ffd34d", T: "#c99a1f", g: "#ff4d4d", z: "#1b1b1b", L: "#2a2a2a", b: "#1b1b1b" }),
+  // LeetCode
+  "Novice": HERO(["stick"], { f: "#3b2a1a" }),
+  "Squire": HERO(["cap", "sword"], { a: "#6abf69", A: "#3f8f4a", h: "#9be09a" }),
+  "Knight": HERO(["helm", "plume", "sword", "shield"], { a: "#5fa8d3", A: "#3d6f8f", h: "#9fd0ea", z: "#5fa8d3", p: "#e0a43a", P: "#a8762a", g: "#e0a43a", L: "#5a5f6a", b: "#3a3f4a", t: "#c9ccd1" }),
+  "Guardian": HERO(["cape", "helm", "wings", "plume", "sword", "shield"], { a: "#e0a43a", A: "#a8762a", h: "#ffd699", m: "#ffd34d", M: "#c99a1f", z: "#e0a43a", g: "#ffffff", c: "#3d6f8f", C: "#28485c", p: "#ffffff", P: "#c9c9c9", t: "#ffd34d", L: "#5a4a3a" }),
+};
+const WEAPONS = new Set(["stick", "bow", "dagger", "sword", "greatsword", "staff", "hammer", "axe", "doubleAxe"]);
+const spriteCache = new Map();
+function spriteRows(tierName) {
+  if (spriteCache.has(tierName)) return spriteCache.get(tierName);
+  const hero = SPRITES[tierName] || SPRITES.Newbie;
+  const grid = Array.from({ length: SPRITE_H }, () => Array(SPRITE_W).fill(" "));
+  const stamp = ({ y, rows }) => rows.forEach((row, dy) => [...row].forEach((ch, x) => { if (ch !== " ") grid[y + dy][x] = ch; }));
+  const back = hero.layers.filter(l => l === "cape"), front = hero.layers.filter(l => l !== "cape" && l !== "shield");
+  back.forEach(l => stamp(GEAR[l]));
+  stamp(BODY);
+  front.forEach(l => { stamp(GEAR[l]); if (WEAPONS.has(l)) stamp(FIST); });
+  if (hero.layers.includes("shield")) stamp(GEAR.shield);
+  const result = { rows: grid.map(r => r.join("")), colors: { ...BASE_COLORS, ...hero.colors } };
+  spriteCache.set(tierName, result);
+  return result;
+}
+const sprite = (tierName, size = 3, cls = "sprite") => { const s = spriteRows(tierName); return pixelArt(s.rows, s.colors, size, cls); };
+// Head-and-shoulders crop, used as the player's avatar.
+const portraitRows = tierName => { const s = spriteRows(tierName); return { rows: s.rows.slice(0, 16).map(r => r.slice(3, 21)), colors: s.colors }; };
+const portrait = (tierName, size = 1.25) => { const p = portraitRows(tierName); return pixelArt(p.rows, p.colors, size, "avatar"); };
+// Same crop on a canvas, for Chart.js point styles and axis labels.
+const portraitCanvasCache = new Map();
+function portraitCanvas(tierName, size = 1) {
+  const key = `${tierName}@${size}`;
+  if (portraitCanvasCache.has(key)) return portraitCanvasCache.get(key);
+  const { rows, colors } = portraitRows(tierName);
+  const canvas = document.createElement("canvas");
+  canvas.width = rows[0].length * size; canvas.height = rows.length * size;
+  const ctx = canvas.getContext("2d");
+  rows.forEach((row, y) => [...row].forEach((ch, x) => { if (colors[ch]) { ctx.fillStyle = colors[ch]; ctx.fillRect(x * size, y * size, size, size); } }));
+  portraitCanvasCache.set(key, canvas);
+  return canvas;
+}
+
+// Small mirrored 5x5 sprite from a hash of the name, so everyone gets a stable avatar.
+const AVATAR_COLORS = ["#5fa8d3", "#e0a43a", "#6abf69", "#d4b33a", "#c97b9b", "#9f8fe0", "#4fc3c3", "#e07a5f"];
+function avatar(name, size = 3) {
+  let h = 2166136261;
+  for (const c of String(name)) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+  const rows = [];
+  for (let y = 0; y < 5; y++) {
+    let half = "";
+    for (let x = 0; x < 3; x++) half += (h >>> (y * 3 + x)) & 1 ? "#" : ".";
+    rows.push(half + half[1] + half[0]);
+  }
+  if (!rows.join("").includes("#")) rows[2] = "..#..";
+  return pixelArt(rows, { "#": AVATAR_COLORS[(h >>> 16) % AVATAR_COLORS.length] }, size, "avatar");
+}
+
+// 8-bit spinner: eight pixels around a diamond, lit in turn.
+function spinner() {
+  const cells = [[2, 0], [3, 1], [4, 2], [3, 3], [2, 4], [1, 3], [0, 2], [1, 1]];
+  return `<svg class="spin" viewBox="0 0 5 5" shape-rendering="crispEdges" role="status" aria-label="Loading">` +
+    cells.map(([x, y], i) => `<rect x="${x}" y="${y}" width="1" height="1" fill="currentColor" style="animation-delay:${(i * 0.1).toFixed(1)}s"/>`).join("") + "</svg>";
+}
+const loadingRow = (cols, text = "loading") => `<tr><td colspan="${cols}"><div class="loading">${spinner()}${text}</div></td></tr>`;
+
+$("brand-icon").innerHTML = pixelArt(TROPHY, TROPHY_COLORS, 1.5);
+$("hero").innerHTML =
+  `<div class="side" title="Codeforces · Legendary GM">${sprite("Legendary GM", 4)}</div>` +
+  `<div class="hero-center"><div class="bob">${pixelArt(TROPHY, TROPHY_COLORS, 6)}</div>` +
+  `<h2>CP LEADERBOARD</h2><p>Codeforces × LeetCode · weekly · bi-weekly · monthly</p></div>` +
+  `<div class="side" title="LeetCode · Guardian">${sprite("Guardian", 4)}</div>`;
+
+// Next-sync progress: the fetcher runs on cron "0 */6 * * *" (UTC), i.e. every 6h from epoch.
+function updateSyncBar() {
+  const period = 6 * 3600e3, elapsed = Date.now() % period, left = period - elapsed;
+  $("sync-bar").style.setProperty("--p", (elapsed / period).toFixed(3));
+  $("sync-left").textContent = `~${Math.floor(left / 3600e3)}h ${String(Math.floor(left / 60e3) % 60).padStart(2, "0")}m`;
+}
+updateSyncBar();
+setInterval(updateSyncBar, 60e3);
+
+// ---------- Ranks: tiers, XP bars, legend ----------
+const CF_TIERS = [
+  [0, "Newbie", "#9e9e9e"], [1200, "Pupil", "#6abf69"], [1400, "Specialist", "#4fc3c3"], [1600, "Expert", "#6b8cff"],
+  [1900, "Candidate Master", "#b36bff"], [2100, "Master", "#ffb347"], [2300, "Intl. Master", "#ff9f1a"],
+  [2400, "Grandmaster", "#ff6b6b"], [2600, "Intl. Grandmaster", "#ff4040"], [3000, "Legendary GM", "#ff1f1f"],
+];
+// LeetCode only names Knight and Guardian (set by contest percentile), so these cut-offs are approximate.
+const LC_TIERS = [[0, "Novice", "#9e9e9e"], [1500, "Squire", "#6abf69"], [1850, "Knight", "#5fa8d3"], [2150, "Guardian", "#e0a43a"]];
+function tierOf(tiers, rating) {
+  if (rating == null) return null;
+  const i = tiers.findLastIndex(t => rating >= t[0]);
+  const [floor, name, color] = tiers[i], next = tiers[i + 1];
+  return { name, color, next: next?.[0], nextName: next?.[1], pct: next ? (rating - floor) / (next[0] - floor) : 1 };
+}
+// The tier a player is shown as: the given platform's, or for "all" whichever rating is higher.
+function playerTier(cf, lc, platform = "all") {
+  if (platform === "cf") return tierOf(CF_TIERS, cf);
+  if (platform === "lc") return tierOf(LC_TIERS, lc);
+  return (cf ?? -1) >= (lc ?? -1) ? tierOf(CF_TIERS, cf) : tierOf(LC_TIERS, lc);
+}
+// Avatar: the tier character's portrait, or the name identicon while unrated.
+const playerAvatar = (name, cf, lc, platform) => { const t = playerTier(cf, lc, platform); return t ? portrait(t.name) : avatar(name); };
+// One party slot: platform + tier, rating / next, XP bar, then the full character.
+function heroSlot(label, tiers, rating) {
+  const t = tierOf(tiers, rating);
+  if (!t) return `<div class="hero-slot unrated" style="--c:var(--faint)"><div class="slot-head"><span>${label} Unrated</span><span>–</span></div>` +
+    `<div class="xp"><i></i></div><div class="slot-art">${sprite(tiers[0][1])}</div></div>`;
+  const r = Math.round(rating);
+  const title = t.next ? `${t.next - r} rating to ${t.nextName}` : "Top tier";
+  return `<div class="hero-slot" style="--c:${t.color}" title="${esc(title)}">` +
+    `<div class="slot-head"><span>${label} <b>${t.name}</b></span><span>${t.next ? `${r}/${t.next}` : `${r} max`}</span></div>` +
+    `<div class="xp"><i style="--p:${Math.min(1, Math.max(0, t.pct)).toFixed(3)}"></i></div>` +
+    `<div class="slot-art">${sprite(t.name)}</div></div>`;
+}
+function renderRanks() {
+  const best = r => Math.max(r.cf_rating ?? 0, r.lc_rating ?? 0);
+  $("ranks").innerHTML = [...boardRows].sort((a, b) => best(b) - best(a)).map(r =>
+    `<div class="rank-card screen"><h3>${playerAvatar(r.name, r.cf_rating, r.lc_rating)}${esc(r.name)}</h3>` +
+    `<div class="party">${heroSlot("CF", CF_TIERS, r.cf_rating)}${heroSlot("LC", LC_TIERS, r.lc_rating)}</div></div>`
+  ).join("") || `<div class="loading">no players yet</div>`;
+}
+function renderLegend() {
+  const list = tiers => tiers.map((t, i) =>
+    `<li>${sprite(t[1], 1, "sprite-sm")}<span style="color:${t[2]}">${t[1]}</span><span>${t[0]}${tiers[i + 1] ? `–${tiers[i + 1][0] - 1}` : "+"}</span></li>`).join("");
+  $("legend").innerHTML = `<h4>Codeforces</h4><ul>${list(CF_TIERS)}</ul><h4>LeetCode</h4><ul>${list(LC_TIERS)}</ul>` +
+    `<p>The XP bar fills from your tier's floor to the next tier. LeetCode tiers are approximate.</p>`;
+}
+renderLegend();
+$("ranks").innerHTML = `<div class="loading">${spinner()}loading</div>`;
+
+// ---------- Contest calendar ----------
+let contestsData = [];
+let calMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let calSelected = null;
+const dayKey = d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+const contestTag = c => c.platform === "codeforces" ? `<span class="tag cf">CF</span>` : `<span class="tag lc">LC</span>`;
+function renderCalendar() {
+  const byDay = new Map();
+  for (const c of contestsData) {
+    const key = dayKey(new Date(c.start));
+    if (!byDay.has(key)) byDay.set(key, []);
+    byDay.get(key).push(c);
+  }
+  const first = calMonth, start = new Date(first);
+  start.setDate(1 - first.getDay());
+  const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  const cellCount = Math.ceil((first.getDay() + daysInMonth) / 7) * 7;
+  const today = dayKey(new Date());
+  let cells = "";
+  for (let i = 0; i < cellCount; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const key = dayKey(d), list = byDay.get(key) || [];
+    const kinds = [...new Set(list.map(c => c.platform === "codeforces" ? "cf" : "lc"))];
+    const cls = ["cal-cell", d.getMonth() !== first.getMonth() && "out", key === today && "today", list.length && "has", key === calSelected && "sel"].filter(Boolean).join(" ");
+    const title = list.map(c => `${c.platform === "codeforces" ? "CF" : "LC"} · ${c.name}`).join("\n");
+    cells += `<button type="button" class="${cls}" data-k="${key}" ${list.length ? `title="${esc(title)}"` : 'tabindex="-1"'}>` +
+      `<span>${d.getDate()}</span><span class="marks">${kinds.map(k => `<b class="${k}"></b>`).join("")}</span></button>`;
+  }
+  $("calendar").innerHTML =
+    `<div class="cal-head"><button type="button" class="cal-nav" data-d="-1" aria-label="Previous month">‹</button>` +
+    `<span>${first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</span>` +
+    `<button type="button" class="cal-nav" data-d="1" aria-label="Next month">›</button></div>` +
+    `<div class="cal-grid">${["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(d => `<span class="dow">${d}</span>`).join("")}${cells}</div>` +
+    `<div class="cal-legend"><span><b style="background:var(--cf)"></b>Codeforces</span><span><b style="background:var(--lc)"></b>LeetCode</span></div>`;
+  const list = calSelected && byDay.get(calSelected);
+  $("cal-day").innerHTML = list?.length
+    ? `<h4>${new Date(list[0].start).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</h4><ul>` +
+      list.map(c => `<li>${contestTag(c)}<time>${new Date(c.start).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</time>` +
+        `<a href="${esc(/^https:\/\//i.test(c.url) ? c.url : "#")}" target="_blank" rel="noopener noreferrer">${esc(c.name)}</a></li>`).join("") + "</ul>"
+    : "";
+}
+$("calendar").addEventListener("click", event => {
+  const nav = event.target.closest(".cal-nav");
+  if (nav) {
+    calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + Number(nav.dataset.d), 1);
+    return renderCalendar();
+  }
+  const cell = event.target.closest(".cal-cell.has");
+  if (cell) {
+    calSelected = calSelected === cell.dataset.k ? null : cell.dataset.k;
+    renderCalendar();
+  }
+});
+$("calendar").innerHTML = `<div class="loading">${spinner()}loading</div>`;
 const HANDLE_PATTERN = /^[A-Za-z0-9_.-]{1,40}$/;
 function handleFromProfileInput(platform, value) {
   const raw = String(value ?? "").trim();
@@ -181,18 +1045,44 @@ $("codeforces").addEventListener("input", updateProfileLinks);
 $("codeforces").addEventListener("blur", () => normalizeHandleField("codeforces", "codeforces"));
 $("leetcode").addEventListener("input", updateProfileLinks);
 $("leetcode").addEventListener("blur", () => normalizeHandleField("leetcode", "leetcode"));
-const EMAIL_USERNAME_KEY = "cp-leaderboard.gmail-username";
-$("email").value = localStorage.getItem(EMAIL_USERNAME_KEY) || "";
-$("email").addEventListener("input", () => localStorage.setItem(EMAIL_USERNAME_KEY, $("email").value));
+async function loadClerk() {
+  await new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = CLERK_JS_URL;
+    script.async = true;
+    script.crossOrigin = "anonymous";
+    script.dataset.clerkPublishableKey = CLERK_PUBLISHABLE_KEY;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("Could not load sign-in. Check your connection or ad blocker."));
+    document.head.appendChild(script);
+  });
+  const instance = typeof window.Clerk === "function" ? new window.Clerk(CLERK_PUBLISHABLE_KEY) : window.Clerk;
+  // Match Clerk's sign-in modal to the page's dark tokens.
+  await instance.load({
+    appearance: {
+      variables: {
+        colorBackground: "#121212", colorText: "#f5f5f5", colorTextSecondary: "#a3a3a3",
+        colorInputBackground: "#070707", colorInputText: "#f5f5f5", colorPrimary: "#e4e4e4", colorNeutral: "#f5f5f5",
+        colorTextOnPrimaryBackground: "#121212", borderRadius: "0px"
+      }
+    }
+  });
+  return instance;
+}
+function currentUser() {
+  const u = clerk?.user;
+  if (!u) return null;
+  return { id: u.id, email: u.primaryEmailAddress?.emailAddress || "", name: u.fullName || u.username || "" };
+}
 let currentPeriod = "week";
+let boardRows = [];
 let profileLoadedFor = null;
-let currentUser = null;
+let groupUser = null;
 let groups = [];
 let currentGroup = null;
 let boardRequest = 0;
 let groupsRequest = 0;
 let membersRequest = 0;
-let refreshRequest = 0;
 const PENDING_INVITE_KEY = "cp-leaderboard.pending-invite";
 const scopeKey = user => `cp-leaderboard.dashboard.${user.id}`;
 const incomingUrl = new URL(window.location.href);
@@ -206,7 +1096,7 @@ $("invite-code").value = localStorage.getItem(PENDING_INVITE_KEY) || "";
 function updateInviteNotice() {
   const pending = Boolean(localStorage.getItem(PENDING_INVITE_KEY));
   $("invite-notice").hidden = !pending;
-  $("invite-notice-text").textContent = currentUser
+  $("invite-notice-text").textContent = groupUser
     ? "You have a group invitation. Save your profile, then use Join group below."
     : "You have a group invitation. Sign in to join; your invitation will be kept during sign-in.";
   if (pending) $("group-tools").open = true;
@@ -226,35 +1116,42 @@ updateInviteNotice();
 
 function renderGroupNavigation() {
   const select = $("dashboard-select");
-  select.replaceChildren(new Option(currentUser ? "Choose a group" : "Sign in to use groups", ""));
+  select.replaceChildren(new Option(groupUser ? "Choose a group" : "Sign in to use groups", ""));
   for (const group of groups) select.add(new Option(group.name, group.id));
   select.value = currentGroup || "";
   select.disabled = !groups.length;
-  $("create-group").disabled = !currentUser;
-  $("join-group").disabled = !currentUser;
-  $("group-help").textContent = currentUser
+  $("create-group").disabled = !groupUser;
+  $("join-group").disabled = !groupUser;
+  $("group-help").textContent = (groupUser
     ? "Groups and membership are visible only to members. Share an invitation to bring friends in. Individual scores remain public in global rankings."
-    : "Sign in and save your profile to create or join an invitation-only group. Individual scores remain visible in global rankings.";
+    : "Sign in and save your profile to create or join an invitation-only group. Individual scores remain visible in global rankings.")
+    + (REGISTRATION_OPEN ? "" : " Registration is currently closed; invitations work for existing players.");
   const group = groups.find(group => group.id === currentGroup);
   $("dashboard-title").textContent = group?.name || "Global rankings";
   $("dashboard-description").textContent = group
     ? "Invitation-only group · Standings for your members. New members appear before their first stats update."
     : "Everyone on CP Leaderboard.";
   $("group-dashboard").hidden = !group;
-  $("owner-tools").hidden = !group || group.owner_id !== currentUser?.id;
-  $("leave-group").hidden = !group || group.owner_id === currentUser?.id;
+  $("owner-tools").hidden = !group || group.owner_id !== groupUser?.id;
+  $("leave-group").hidden = !group || group.owner_id === groupUser?.id;
   $("global-rankings").setAttribute("aria-pressed", String(!group));
 }
 
 async function selectDashboard(groupId, remember = true) {
   currentGroup = groups.some(group => group.id === groupId) ? groupId : null;
-  if (currentUser && remember) localStorage.setItem(scopeKey(currentUser), currentGroup || "global");
+  if (groupUser && remember) localStorage.setItem(scopeKey(groupUser), currentGroup || "global");
   membersRequest++;
   $("member-list").replaceChildren();
   $("invite-link").value = "";
   $("invite-link-label").hidden = true;
   $("members-panel").open = false;
   for (const id of ["member-count", "group-points", "group-solved"]) $(id).textContent = "—";
+  boardRows = [];
+  duelToken++;
+  duelChart?.destroy();
+  duelChart = null;
+  renderBoard();
+  renderHeatmap();
   renderGroupNavigation();
   await Promise.all([showLeaderboard(), currentGroup ? loadGroupMembers() : Promise.resolve()]);
 }
@@ -263,7 +1160,7 @@ async function loadGroups(user, preferredScope) {
   const request = ++groupsRequest;
   if (!user) return selectDashboard(null, false);
   const { data, error } = await supabase.from("groups").select("id,name,owner_id,created_at").order("created_at");
-  if (request !== groupsRequest || currentUser?.id !== user.id) return;
+  if (request !== groupsRequest || groupUser?.id !== user.id) return;
   if (error) {
     groups = [];
     await selectDashboard(null, false);
@@ -290,11 +1187,11 @@ async function loadGroupMembers() {
   for (const member of data) {
     const li = document.createElement("li");
     const name = document.createElement("span");
-    name.textContent = `${member.profiles.name}${member.user_id === group.owner_id ? " · Owner" : ""}${member.user_id === currentUser.id ? " · You" : ""}`;
+    name.textContent = `${member.profiles.name}${member.user_id === group.owner_id ? " · Owner" : ""}${member.user_id === groupUser.id ? " · You" : ""}`;
     li.appendChild(name);
-    if (group.owner_id === currentUser.id && member.user_id !== currentUser.id) {
+    if (group.owner_id === groupUser.id && member.user_id !== groupUser.id) {
       const remove = document.createElement("button");
-      remove.className = "action";
+      remove.className = "btn btn-ghost";
       remove.textContent = "Remove";
       remove.setAttribute("aria-label", `Remove ${member.profiles.name} from group`);
       remove.onclick = () => {
@@ -310,19 +1207,19 @@ async function loadGroupMembers() {
 }
 
 async function runGroupAction(button, action, onSuccess) {
-  const userId = currentUser?.id;
+  const userId = groupUser?.id;
   if (!userId) return setMessage("group-message", "Sign in first, then save your profile.");
   button.disabled = true;
   setMessage("group-message", "Working...");
   try {
     const { data, error } = await action();
-    if (currentUser?.id !== userId) return;
+    if (groupUser?.id !== userId) return;
     if (error) return showError("group-message", error);
     await onSuccess(data);
   } catch (error) {
-    if (currentUser?.id === userId) showError("group-message", error);
+    if (groupUser?.id === userId) showError("group-message", error);
   } finally {
-    button.disabled = !currentUser;
+    button.disabled = !groupUser;
   }
 }
 
@@ -332,8 +1229,8 @@ $("create-group-form").onsubmit = event => {
   event.preventDefault();
   runGroupAction($("create-group"), () => supabase.rpc("create_group", { group_name: $("group-name").value.trim() }), async id => {
     $("group-name").value = "";
-    localStorage.setItem(scopeKey(currentUser), id);
-    await loadGroups(currentUser, id);
+    localStorage.setItem(scopeKey(groupUser), id);
+    await loadGroups(groupUser, id);
     $("group-tools").open = false;
     $("members-panel").open = true;
     setMessage("group-message", "Group created. Use Copy invitation to invite your friends.");
@@ -350,8 +1247,8 @@ $("join-group-form").onsubmit = event => {
     localStorage.removeItem(PENDING_INVITE_KEY);
     $("invite-code").value = "";
     updateInviteNotice();
-    localStorage.setItem(scopeKey(currentUser), id);
-    await loadGroups(currentUser, id);
+    localStorage.setItem(scopeKey(groupUser), id);
+    await loadGroups(groupUser, id);
     $("group-tools").open = false;
     setMessage("group-message", "Joined! This is your group dashboard.");
   });
@@ -380,73 +1277,621 @@ for (const action of ["leave", "delete"]) {
     const group = groups.find(group => group.id === currentGroup);
     if (!group || !confirm(action === "delete" ? `Delete ${group.name} for all members? This cannot be undone.` : `Leave ${group.name}?`)) return;
     runGroupAction($(action + "-group"), () => supabase.rpc(action + "_group", { target_group: group.id }), async () => {
-      localStorage.removeItem(scopeKey(currentUser));
-      await loadGroups(currentUser);
+      localStorage.removeItem(scopeKey(groupUser));
+      await loadGroups(groupUser);
       setMessage("group-message", action === "delete" ? "Group deleted." : "You left the group.");
     });
   };
 }
+
+
 
 async function showLeaderboard(period = currentPeriod) {
   const request = ++boardRequest;
   const groupId = currentGroup;
   currentPeriod = period;
   [...$("tabs").children].forEach(button => button.classList.toggle("on", button.dataset.k === period));
-  $("board").innerHTML = "<tr><td colspan=\"6\">Loading...</td></tr>";
-  if (groupId) for (const id of ["group-points", "group-solved"]) $(id).textContent = "—";
+  $("board").innerHTML = loadingRow(6);
   const days = { week: 7, biweek: 14, month: 30, all: null }[period];
+  if (groupId) for (const id of ["group-points", "group-solved"]) $(id).textContent = "—";
   const { data, error } = await supabase.rpc(groupId ? "group_leaderboard" : "leaderboard", groupId ? { target_group: groupId, days } : { days });
   if (request !== boardRequest || groupId !== currentGroup) return;
   if (error) {
-    $("board").innerHTML = "<tr><td colspan=\"6\">Leaderboard is unavailable.</td></tr>";
+    $("board").innerHTML = "<tr><td colspan=\"6\" class=\"empty\">leaderboard unavailable</td></tr>";
     return showError("group-message", error);
   }
-  if (groupId) {
-    $("group-points").textContent = data.reduce((total, row) => total + row.points, 0).toLocaleString();
-    $("group-solved").textContent = data.reduce((total, row) => total + row.solved, 0).toLocaleString();
-  }
-  $("board").innerHTML = data.map((row, index) =>
-    `<tr><td>${index + 1}</td><td>${esc(row.name)}${row.has_snapshot === false ? ' <span class="muted">(awaiting stats)</span>' : ""}</td><td class="n">${row.points}</td><td class="n">${row.solved}</td>` +
-    `<td class="n">${esc(row.cf_rating)}</td><td class="n">${esc(row.lc_rating)}</td></tr>`).join("") ||
-    "<tr><td colspan=\"6\">No leaderboard entries yet.</td></tr>";
+  boardRows = data;
+  renderBoard();
+  renderHeatmap();
 }
 
+// Re-render from the last fetched rows; platform/sort changes need no new request.
+function renderBoard() {
+  const platform = $("platform").value;
+  const sort = $("sort").value;
+  $("cf-head").hidden = platform === "lc";
+  $("lc-head").hidden = platform === "cf";
+  const rows = boardRows.map(row => {
+    const pick = (cf, lc, all) => platform === "cf" ? cf : platform === "lc" ? lc : all;
+    return {
+      name: row.name,
+      raw: row,
+      cf_rating: row.cf_rating,
+      lc_rating: row.lc_rating,
+      // Per-platform fields come from the updated leaderboard() SQL; "–" until it is installed.
+      points: pick(row.cf_points, row.lc_points, row.points),
+      solved: pick(row.cf_solved, row.lc_solved, row.solved),
+      rating: pick(row.cf_rating, row.lc_rating, Math.max(row.cf_rating ?? -1, row.lc_rating ?? -1)),
+    };
+  });
+  const key = r => (sort === "rating" ? r.rating : r[sort]) ?? -1;
+  rows.sort((a, b) => key(b) - key(a) || (b.points ?? 0) - (a.points ?? 0));
+  const cols = 4 + (platform === "all" ? 2 : 1);
+  $("board").innerHTML = rows.map((row, index) =>
+    `<tr class="${["first", "second", "third"][index] ?? ""}"><td class="rank">${String(index + 1).padStart(2, "0")}</td><td class="name">${playerAvatar(row.name, row.cf_rating, row.lc_rating, platform)}${esc(row.name)}${row.raw.has_snapshot === false ? '<span class="awaiting-stats">awaiting stats</span>' : ""}</td><td class="n">${esc(row.points)}</td><td class="n">${esc(row.solved)}</td>` +
+    (platform !== "lc" ? `<td class="n">${esc(row.cf_rating)}</td>` : "") +
+    (platform !== "cf" ? `<td class="n">${esc(row.lc_rating)}</td>` : "") + "</tr>").join("") ||
+    `<tr><td colspan="${cols}" class="empty">no entries yet</td></tr>`;
+  $("user-count").textContent = `${boardRows.length} user${boardRows.length === 1 ? "" : "s"}`;
+  if (currentGroup) {
+    $("group-points").textContent = rows.reduce((total, row) => total + (row.points || 0), 0).toLocaleString();
+    $("group-solved").textContent = rows.reduce((total, row) => total + (row.solved || 0), 0).toLocaleString();
+  }
+  renderChart(rows, platform, sort);
+  renderRanks();
+  renderArena();
+  renderAlert();
+}
+
+// Horizontal bars of the same rows as the table: CF/LC stacked for score and solved, side by side for rating.
+// Chart colors and font come from the CSS tokens in :root.
+const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+// Theme colors can be oklch()/color-mix(), which Chart.js can't parse: paint one pixel and read it back as rgba().
+const colorProbe = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+function cssColor(name) {
+  const raw = cssVar(name);
+  colorProbe.clearRect(0, 0, 1, 1);
+  colorProbe.fillStyle = "#000"; colorProbe.fillStyle = raw;
+  colorProbe.fillRect(0, 0, 1, 1);
+  const [r, g, b, a] = colorProbe.getImageData(0, 0, 1, 1).data;
+  return `rgba(${r},${g},${b},${(a / 255).toFixed(3)})`;
+}
+const CHART_COLORS = { cf: cssColor("--cf"), lc: cssColor("--lc"), all: cssColor("--all") };
+function chartTheme() {
+  // Pixel font axes, square marks and a flat bordered tooltip, like the 8-bit Chart component.
+  window.Chart.defaults.font.family = cssVar("--pixel");
+  window.Chart.defaults.font.size = 11;
+  Object.assign(window.Chart.defaults.plugins.tooltip, {
+    backgroundColor: cssColor("--panel"), titleColor: cssColor("--fg"), bodyColor: cssColor("--fg"), footerColor: cssColor("--fg"), borderColor: cssColor("--ring"), borderWidth: 2, cornerRadius: 0, padding: 10,
+    boxPadding: 4, usePointStyle: true, titleFont: { size: 12 }, bodyFont: { size: 12 }, footerFont: { size: 12 },
+  });
+  return { grid: { color: cssColor("--track") }, ticks: { color: cssColor("--muted") }, border: { color: cssColor("--line"), dash: [2, 4] } };
+}
+// Bars drawn like XP bars: 2px gaps every 8px, a lit top edge and a shaded bottom edge.
+const pixelBars = {
+  id: "pixelBars",
+  afterDatasetsDraw(chart) {
+    const { ctx } = chart, bg = cssColor("--bg");
+    ctx.save();
+    chart.data.datasets.forEach((_, i) => {
+      const meta = chart.getDatasetMeta(i);
+      if (meta.hidden) return;
+      for (const bar of meta.data) {
+        const { x, y, base, height } = bar.getProps(["x", "y", "base", "height"], true);
+        const left = Math.min(x, base), width = Math.abs(x - base), top = y - height / 2;
+        if (width < 1) continue;
+        ctx.fillStyle = "rgba(255,255,255,.3)"; ctx.fillRect(left, top, width, 2);
+        ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(left, top + height - 2, width, 2);
+        ctx.fillStyle = bg;
+        for (let gx = left + 6; gx < left + width - 1; gx += 8) ctx.fillRect(gx, top, 2, height);
+      }
+    });
+    ctx.restore();
+  },
+};
+// Tier portraits beside the y-axis names (the ticks leave a gap for them via padding).
+const portraitLabels = images => ({
+  id: "portraitLabels",
+  afterDraw(chart) {
+    const y = chart.scales.y;
+    images.forEach((img, i) => img && chart.ctx.drawImage(img, y.right - img.width - 6, Math.round(y.getPixelForValue(i) - img.height / 2)));
+  },
+});
+let chart = null;
+let chartView = "standings";
+let chartToken = 0;
+function renderChart(rows, platform, sort) {
+  chart?.destroy();
+  chart = null;
+  chartToken++;
+  $("chart-note").hidden = true;
+  if (chartView === "progress") return renderProgress(platform, sort, chartToken);
+  $("chart-wrap").hidden = !rows.length || !window.Chart;
+  if ($("chart-wrap").hidden) return;
+  const [cfKey, lcKey] = { points: ["cf_points", "lc_points"], solved: ["cf_solved", "lc_solved"], rating: ["cf_rating", "lc_rating"] }[sort];
+  // Older leaderboard() without per-platform columns: fall back to one combined series.
+  const split = sort === "rating" || rows[0].raw[cfKey] !== undefined;
+  const series = (label, key, color) => ({ label, data: rows.map(r => r.raw[key] ?? 0), backgroundColor: color, borderRadius: 0, barPercentage: 0.7, categoryPercentage: 0.85 });
+  const tierColors = rows.map(r => playerTier(r.cf_rating, r.lc_rating, platform)?.color ?? CHART_COLORS.all);
+  const datasets = !split ? [series("All", sort, tierColors)] : [
+    ...(platform !== "lc" ? [series("Codeforces", cfKey, CHART_COLORS.cf)] : []),
+    ...(platform !== "cf" ? [series("LeetCode", lcKey, CHART_COLORS.lc)] : []),
+  ];
+  const stacked = sort !== "rating";
+  const barRows = stacked ? 1 : datasets.length;
+  $("chart-wrap").style.height = `${Math.max(160, rows.length * 46 * barRows + 100)}px`;
+  const axis = chartTheme();
+  const portraits = rows.map(r => { const t = playerTier(r.cf_rating, r.lc_rating, platform); return t && portraitCanvas(t.name, 2); });
+  chart = new window.Chart($("chart"), {
+    type: "bar",
+    data: { labels: rows.map(r => r.name), datasets },
+    plugins: [pixelBars, portraitLabels(portraits)],
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400, easing: "linear" },
+      interaction: { mode: "index", axis: "y", intersect: false },
+      scales: {
+        x: { ...axis, stacked, beginAtZero: true },
+        y: { ...axis, stacked, grid: { display: false }, ticks: { color: cssColor("--fg"), padding: 46 } },
+      },
+      plugins: {
+        legend: { display: datasets.length > 1, labels: { color: cssColor("--muted"), usePointStyle: true, pointStyle: "rect", boxWidth: 8, boxHeight: 8 } },
+        tooltip: { callbacks: { footer: items => stacked && items.length > 1 ? `Total: ${items.reduce((n, i) => n + i.parsed.x, 0)}` : "" } },
+      },
+    },
+  });
+}
+// ---- Progress view: one line per person over the selected period, from saved snapshots ----
+const LINE_COLORS = ["#60a5fa", "#f5a524", "#34d399", "#f472b6", "#a78bfa", "#f87171", "#22d3ee", "#facc15"];
+const progressCache = {};
+async function loadProgress(period) {
+  if (progressCache[period]) return progressCache[period];
+  const days = { week: 7, biweek: 14, month: 30, all: null }[period];
+  const { data: profiles, error: profileError } = await supabase.from("profiles").select("id,name");
+  if (profileError) throw profileError;
+  const snaps = [];
+  for (let from = 0; ; from += 1000) { // PostgREST caps responses at 1000 rows
+    let query = supabase.from("snapshots").select("user_id,taken_at,points,solved,cf_rating,lc_rating,stats")
+      .order("taken_at").range(from, from + 999);
+    if (days) query = query.gte("taken_at", new Date(Date.now() - days * 864e5).toISOString());
+    const { data, error } = await query;
+    if (error) throw error;
+    snaps.push(...data);
+    if (data.length < 1000) break;
+  }
+  return (progressCache[period] = { names: new Map(profiles.map(p => [p.id, p.name])), snaps });
+}
+function snapshotValue(snap, platform, sort) {
+  const st = snap.stats || {};
+  const lcSolved = (st.lc_easy ?? 0) + (st.lc_medium ?? 0) + (st.lc_hard ?? 0);
+  const lcPoints = 5 * (st.lc_easy ?? 0) + 10 * (st.lc_medium ?? 0) + 20 * (st.lc_hard ?? 0);
+  if (sort === "rating") {
+    if (platform !== "all") return platform === "cf" ? snap.cf_rating : snap.lc_rating;
+    const best = Math.max(snap.cf_rating ?? -Infinity, snap.lc_rating ?? -Infinity);
+    return Number.isFinite(best) ? best : null;
+  }
+  if (sort === "solved") return platform === "cf" ? st.cf_solved ?? 0 : platform === "lc" ? lcSolved : snap.solved;
+  return platform === "cf" ? st.cf_points ?? 0 : platform === "lc" ? lcPoints : snap.points;
+}
+async function renderProgress(platform, sort, token) {
+  let data;
+  try {
+    if (!progressCache[currentPeriod]) {
+      $("chart-note").innerHTML = `${spinner()} loading history`;
+      $("chart-note").hidden = false;
+    }
+    data = await loadProgress(currentPeriod);
+  } catch (error) {
+    $("chart-wrap").hidden = true;
+    showError("chart-note", error);
+    $("chart-note").hidden = false;
+    return;
+  }
+  if (token !== chartToken) return; // a newer render started meanwhile
+  const byUser = new Map();
+  const memberNames = new Set(boardRows.map(row => row.name));
+  const scopedSnaps = data.snaps.filter(snap => !currentGroup || memberNames.has(data.names.get(snap.user_id)));
+  for (const snap of scopedSnaps) {
+    const value = snapshotValue(snap, platform, sort);
+    if (value == null) continue;
+    if (!byUser.has(snap.user_id)) byUser.set(snap.user_id, []);
+    byUser.get(snap.user_id).push({ x: new Date(snap.taken_at).getTime(), y: value });
+  }
+  // Score/solved show gains since the first snapshot in the window; rating shows the actual rating.
+  // Stepped lines (a value holds until the next snapshot) with the player's tier portrait on the latest point.
+  const datasets = [...byUser].map(([userId, points], i) => {
+    const base = sort === "rating" ? 0 : points[0].y;
+    const color = LINE_COLORS[i % LINE_COLORS.length];
+    const name = data.names.get(userId) || "Unknown";
+    const row = boardRows.find(r => r.name === name);
+    const tier = row && playerTier(row.cf_rating, row.lc_rating, platform);
+    const last = points.length - 1;
+    return { label: name, data: points.map(p => ({ x: p.x, y: p.y - base })),
+      borderColor: color, backgroundColor: color + "12", pointBackgroundColor: color, pointBorderColor: color,
+      fill: "origin", stepped: "before", borderWidth: 3,
+      pointStyle: points.map((_, j) => j === last && tier ? portraitCanvas(tier.name, 2) : "rect"),
+      pointRadius: points.map((_, j) => j === last ? 13 : 3), pointHoverRadius: points.map((_, j) => j === last ? 14 : 5) };
+  });
+  $("chart-wrap").hidden = !datasets.length || !window.Chart;
+  const days = new Set(scopedSnaps.map(snap => snap.taken_at.slice(0, 10))).size;
+  $("chart-note").textContent = !datasets.length ? "No snapshots in this period yet."
+    : days < 3 ? `Only ${days} day${days === 1 ? "" : "s"} of history so far; lines fill in as snapshots are saved every 6 hours.` : "";
+  $("chart-note").hidden = !$("chart-note").textContent;
+  if ($("chart-wrap").hidden) return;
+  $("chart-wrap").style.height = "280px";
+  const axis = chartTheme();
+  const label = { points: "Points gained", solved: "Problems solved", rating: "Rating" }[sort];
+  chart = new window.Chart($("chart"), {
+    type: "line",
+    data: { datasets },
+    options: {
+      layout: { padding: { top: 18, right: 22 } },
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      interaction: { mode: "nearest", intersect: false },
+      scales: {
+        x: { ...axis, type: "linear", ticks: { ...axis.ticks, maxTicksLimit: 8,
+          // Under two days of data: show times, otherwise dates.
+          callback(v) {
+            return this.max - this.min < 2 * 864e5
+              ? new Date(v).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+              : new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+          } } },
+        y: { ...axis, beginAtZero: sort !== "rating", title: { display: true, text: label, color: cssColor("--faint") } },
+      },
+      plugins: {
+        legend: { labels: { color: cssColor("--muted"), usePointStyle: true, pointStyle: "rect", boxWidth: 8, boxHeight: 8 } },
+        tooltip: { callbacks: { title: items => new Date(items[0].parsed.x).toLocaleString() } },
+      },
+    },
+  });
+}
+for (const button of $("chart-view").children) {
+  button.onclick = () => {
+    chartView = button.dataset.v;
+    [...$("chart-view").children].forEach(b => b.classList.toggle("on", b === button));
+    renderBoard();
+  };
+}
+// Keys: w/b/m/a switch period, s/p switch chart view. Ignored while typing or with modifiers.
+document.addEventListener("keydown", event => {
+  if (event.metaKey || event.ctrlKey || event.altKey || /^(INPUT|SELECT|TEXTAREA)$/.test(event.target.tagName)) return;
+  const period = { w: "week", b: "biweek", m: "month", a: "all" }[event.key];
+  const view = { s: "standings", p: "progress" }[event.key];
+  if (period) [...$("tabs").children].find(b => b.dataset.k === period)?.click();
+  if (view) [...$("chart-view").children].find(b => b.dataset.v === view)?.click();
+  if (event.key === "d" && !$("arena").hidden) $("arena").scrollIntoView({ behavior: "smooth" });
+  if (event.key === "t") applyTheme(THEMES[(THEMES.findIndex(([v]) => v === $("theme").value) + 1) % THEMES.length][0]);
+});
+$("platform").addEventListener("change", renderBoard);
+
+// ---------- Themes (8bitcn/ui palettes; CSS blocks keyed by data-theme on <html>) ----------
+const THEMES = [["default", "Default"], ["sega", "Sega"], ["gameboy", "Gameboy"], ["atari", "Atari"], ["nintendo", "Nintendo"], ["arcade", "Arcade"],
+  ["neo-geo", "Neo Geo"], ["soft-pop", "Soft Pop"], ["vhs", "VHS"], ["pacman", "Pacman"], ["rusty-byte", "Rusty Byte"], ["zelda", "Zelda"],
+  ["dungeon-torch", "Dungeon Torch"], ["space-station", "Space Station"], ["pixel-forest", "Pixel Forest"], ["ice-cavern", "Ice Cavern"],
+  ["lava-core", "Lava Core"], ["glitch-mode", "Glitch Mode"], ["dwarven-vault", "Dwarven Vault"], ["dragon-hoard", "Dragon Hoard"], ["ancient-runes", "Ancient Runes"]];
+function applyTheme(theme) {
+  if (theme === "default") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+  $("theme").value = theme;
+  try { localStorage.setItem("cp-theme", theme); } catch {}
+  if (boardRows.length) renderBoard(); // charts read the new colors at render time
+}
+$("theme").innerHTML = THEMES.map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
+$("theme").value = document.documentElement.dataset.theme || "default";
+$("theme").addEventListener("change", event => applyTheme(event.target.value));
+$("sort").addEventListener("change", renderBoard);
+
+// ---------- Duel arena + head-on alert ----------
+const DUEL_COLORS = ["#60a5fa", "#ff6b6b"];
+const PERIOD_NAMES = { week: "Weekly", biweek: "Bi-weekly", month: "Monthly", all: "All-time" };
+let duelPick = null; // [left name, right name]
+let duelChart = null, duelToken = 0;
+const ptsOf = r => r.points ?? 0;
+const STAR = pixelArt(["  y  ", " yyy ", "yyyyy", " yyy ", " y y "], { y: "#d4b33a" }, 2);
+// Closest pair on period points (within max(3, 10%)) or either rating (within 30). Null when nobody is that close.
+function headOn(rows) {
+  let best = null;
+  for (let i = 0; i < rows.length; i++) for (let j = i + 1; j < rows.length; j++) {
+    const a = rows[i], b = rows[j];
+    for (const [metric, x, y, limit] of [
+      ["pts", a.points, b.points, Math.max(3, 0.1 * Math.max(ptsOf(a), ptsOf(b)))],
+      ["CF rating", a.cf_rating, b.cf_rating, 30],
+      ["LC rating", a.lc_rating, b.lc_rating, 30],
+    ]) {
+      if (x == null || y == null || (!x && !y)) continue;
+      const score = Math.abs(x - y) / limit;
+      if (score <= 1 && (!best || score < best.score)) best = { a, b, metric, gap: Math.round(Math.abs(x - y)), score };
+    }
+  }
+  return best;
+}
+function renderAlert() {
+  const h = headOn(boardRows);
+  $("alert").hidden = !h;
+  if (!h) return;
+  $("alert").innerHTML = `<span class="bang">!</span><strong>HEAD-ON!</strong>` +
+    `<span><b>${esc(h.a.name)}</b> vs <b>${esc(h.b.name)}</b> · ${h.gap ? `${h.gap} ${h.metric} apart` : `tied on ${h.metric}`} · ${PERIOD_NAMES[currentPeriod]}</span>` +
+    `<button class="btn" id="alert-watch">Watch duel &gt;</button>`;
+  $("alert-watch").onclick = () => { duelPick = [h.a.name, h.b.name]; renderArena(); $("arena").scrollIntoView({ behavior: "smooth" }); };
+}
+function fighterCard(r, side, hpShare, color) {
+  const cf = r.cf_rating, lc = r.lc_rating;
+  const rating = (cf ?? -1) >= (lc ?? -1) ? cf : lc;
+  const t = playerTier(cf, lc);
+  const lv = Math.max(1, Math.floor((rating ?? 0) / 100));
+  const xp = !t ? `<div class="xp gold"><span class="lbl">unrated</span></div>`
+    : t.next ? `<div class="xp gold"><i style="--p:${Math.min(1, Math.max(0, t.pct)).toFixed(3)}"></i><span class="lbl">${Math.round(rating)}/${t.next}</span></div>`
+    : `<div class="xp gold"><i style="--p:1"></i><span class="lbl">DING</span></div>`;
+  return `<div class="fighter ${side}${t ? "" : " unrated"}" style="--c:${color}">` +
+    `<div class="f-name">${side === "right" ? `<small>Lv.${lv}</small>` : ""}${esc(r.name)}${side === "left" ? `<small>Lv.${lv}</small>` : ""}</div>` +
+    `<div class="f-tier" style="color:${t?.color ?? "var(--faint)"}">${t ? `${(cf ?? -1) >= (lc ?? -1) ? "CF" : "LC"} ${t.name}` : "Unrated"}</div>` +
+    `<div class="bar-row"><span>HP</span><span>${ptsOf(r)} pts</span></div>` +
+    `<div class="xp hp"><i style="--p:${hpShare.toFixed(3)}"></i><span class="lbl">${Math.round(hpShare * 100)}%</span></div>` +
+    `<div class="bar-row"><span>XP</span><span>${t?.nextName ? `next: ${t.nextName}` : t ? "max tier" : "–"}</span></div>${xp}` +
+    `<div class="f-art"><div class="flip">${sprite(t ? t.name : "Newbie", 5)}</div></div></div>`;
+}
+function taunts(a, b, wins, h) {
+  if (h) return [[a, `${h.gap ? `${h.gap} ${h.metric}` : "Nothing"} between us. Blink and I pass you.`], [b, "Then don't blink. This round is mine."]];
+  if (wins[0] === wins[1]) return [[a, "Dead even? Rematch next week."], [b, "Tie goes to whoever solves the next Hard."]];
+  const [lead, trail] = wins[0] > wins[1] ? [a, b] : [b, a];
+  const gap = Math.abs(ptsOf(a) - ptsOf(b));
+  const trailTier = playerTier(trail.cf_rating, trail.lc_rating)?.name ?? "peasant";
+  return [
+    [lead, gap ? `${gap} points ahead. Kneel, ${trailTier}!` : `More rounds won. Kneel, ${trailTier}!`],
+    [trail, ptsOf(trail) === 0 ? "*sharpens sword quietly* The week isn't over." : "Enjoy the lead. Next contest, you fall."],
+  ];
+}
+function renderArena() {
+  const rows = boardRows;
+  $("arena").hidden = rows.length < 2;
+  if (rows.length < 2) return;
+  const names = rows.map(r => r.name);
+  if (!duelPick || duelPick[0] === duelPick[1] || !duelPick.every(n => names.includes(n))) {
+    const h = headOn(rows);
+    duelPick = h ? [h.a.name, h.b.name] : [...rows].sort((x, y) => ptsOf(y) - ptsOf(x)).slice(0, 2).map(r => r.name);
+  }
+  ["duel-a", "duel-b"].forEach((id, k) => {
+    $(id).innerHTML = names.map(n => `<option${n === duelPick[k] ? " selected" : ""}>${esc(n)}</option>`).join("");
+  });
+  const [a, b] = duelPick.map(n => rows.find(r => r.name === n));
+  const total = ptsOf(a) + ptsOf(b);
+  const shareA = total ? ptsOf(a) / total : 0.5;
+  // Rounds: one per stat both players have; higher value takes it.
+  const wins = [0, 0];
+  const stats = [["Points", "points"], ["Solved", "solved"], ["CF rating", "cf_rating"], ["LC rating", "lc_rating"]].map(([label, key]) => {
+    const x = a[key], y = b[key];
+    if (x == null && y == null) return `<div class="tug-row"><span class="v">–</span><div class="tug-bar l"></div><span class="lab">${label}</span><div class="tug-bar r"></div><span class="v">–</span></div>`;
+    const vx = x ?? 0, vy = y ?? 0, sum = vx + vy;
+    if (vx !== vy) wins[vx > vy ? 0 : 1]++;
+    const px = sum ? vx / sum : 0.5;
+    return `<div class="tug-row"><span class="v${vx > vy ? " won" : ""}">${vx > vy ? STAR : ""}${esc(x ?? "–")}</span>` +
+      `<div class="tug-bar l" style="--c:${DUEL_COLORS[0]}"><i style="--p:${px.toFixed(3)}"></i></div><span class="lab">${label}</span>` +
+      `<div class="tug-bar r" style="--c:${DUEL_COLORS[1]}"><i style="--p:${(1 - px).toFixed(3)}"></i></div>` +
+      `<span class="v${vy > vx ? " won" : ""}">${esc(y ?? "–")}${vy > vx ? STAR : ""}</span></div>`;
+  });
+  const h = headOn([a, b]);
+  const [hi, lo] = [Math.max(...wins), Math.min(...wins)];
+  const leader = wins[0] > wins[1] ? a : b;
+  const verdict = h ? `<div class="verdict hot">HEAD-ON!<br>${h.gap ? `${h.gap} ${h.metric} apart` : `tied on ${h.metric}`}</div>`
+    : wins[0] === wins[1] ? `<div class="verdict">DEAD HEAT<br>${hi}–${lo}</div>`
+    : `<div class="verdict win">${lo === 0 && hi >= 3 ? "FLAWLESS VICTORY" : `${esc(leader.name)} leads`}<br>${hi}–${lo}</div>`;
+  const sparks = Array.from({ length: 14 }, (_, i) =>
+    `<i class="spark" style="left:${(i * 37 + 7) % 100}%;top:${(i * 53 + 5) % 62}%;animation-delay:${(i % 5) * 0.25}s"></i>`).join("");
+  $("arena-round").textContent = `${PERIOD_NAMES[currentPeriod]} round`;
+  $("ring").innerHTML = sparks + fighterCard(a, "left", shareA, DUEL_COLORS[0]) +
+    `<div class="vs"><div class="vs-text">VS</div>${verdict}</div>` + fighterCard(b, "right", 1 - shareA, DUEL_COLORS[1]) + `<div class="floor"></div>`;
+  $("tug").innerHTML = `<div class="tug-head"><span style="color:${DUEL_COLORS[0]}">${esc(a.name)}</span><b>ROUNDS ${wins[0]} : ${wins[1]}</b><span style="color:${DUEL_COLORS[1]}">${esc(b.name)}</span></div>` + stats.join("");
+  $("dialog").innerHTML = taunts(a, b, wins, h).map(([who, line]) => {
+    const t = playerTier(who.cf_rating, who.lc_rating);
+    const color = DUEL_COLORS[who === a ? 0 : 1];
+    return `<div class="say${who === a ? "" : " r"}" style="--c:${color}"><div class="pic">${t ? portrait(t.name, 3) : avatar(who.name, 9)}</div>` +
+      `<div class="bubble"><b>${esc(who.name)}</b>${esc(line)}</div></div>`;
+  }).join("");
+  renderDuelChart(a, b, ++duelToken);
+}
+// Points gained over the period for just the two fighters, in their duel colors.
+async function renderDuelChart(a, b, token) {
+  duelChart?.destroy();
+  duelChart = null;
+  let data;
+  try { data = await loadProgress(currentPeriod); } catch (error) { $("duel-chart-wrap").hidden = true; return showError("duel-note", error); }
+  if (token !== duelToken) return;
+  const series = [a, b].map((r, k) => {
+    const points = data.snaps.filter(snap => data.names.get(snap.user_id) === r.name)
+      .map(snap => ({ x: new Date(snap.taken_at).getTime(), y: snapshotValue(snap, "all", "points") })).filter(p => p.y != null);
+    const base = points[0]?.y ?? 0, color = DUEL_COLORS[k];
+    return { label: r.name, data: points.map(p => ({ x: p.x, y: p.y - base })), borderColor: color, backgroundColor: color + "14",
+      pointBackgroundColor: color, pointBorderColor: color, fill: "origin", stepped: "before", borderWidth: 3, pointStyle: "rect", pointRadius: 3 };
+  });
+  const empty = series.every(d => !d.data.length);
+  $("duel-chart-wrap").hidden = empty || !window.Chart;
+  $("duel-note").textContent = empty ? "No snapshots for these two in this period yet." : "";
+  $("duel-note").hidden = !empty;
+  if ($("duel-chart-wrap").hidden) return;
+  const axis = chartTheme();
+  duelChart = new window.Chart($("duel-chart"), {
+    type: "line",
+    data: { datasets: series },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+      layout: { padding: { top: 6, right: 10 } },
+      interaction: { mode: "nearest", intersect: false },
+      scales: {
+        x: { ...axis, type: "linear", ticks: { ...axis.ticks, maxTicksLimit: 6,
+          callback(v) { return this.max - this.min < 2 * 864e5 ? new Date(v).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" }); } } },
+        y: { ...axis, beginAtZero: true, title: { display: true, text: "Points gained", color: cssColor("--faint") } },
+      },
+      plugins: {
+        legend: { labels: { color: cssColor("--muted"), usePointStyle: true, pointStyle: "rect", boxWidth: 8, boxHeight: 8 } },
+        tooltip: { callbacks: { title: items => new Date(items[0].parsed.x).toLocaleString() } },
+      },
+    },
+  });
+}
+$("duel-a").onchange = $("duel-b").onchange = event => {
+  const k = event.target.id === "duel-a" ? 0 : 1, previous = duelPick[k];
+  duelPick[k] = event.target.value;
+  // Picking the other side's fighter swaps the two rather than mirroring one player.
+  if (duelPick[1 - k] === duelPick[k]) duelPick[1 - k] = previous;
+  renderArena();
+};
+$("duel-swap").onclick = () => { duelPick.reverse(); renderArena(); };
+$("duel-shuffle").onclick = () => {
+  const names = boardRows.map(r => r.name).sort(() => Math.random() - 0.5);
+  duelPick = names.slice(0, 2);
+  renderArena();
+};
+
+// ---------- Next-contest countdown ----------
+// Ticks every second over the contests already loaded for the table; rolls to the next one at zero.
+function renderCountdown() {
+  const now = Date.now();
+  const next = contestsData.find(c => new Date(c.start).getTime() > now);
+  if (!next) {
+    $("countdown").innerHTML = `<div class="loading">no upcoming contests</div>`;
+    return;
+  }
+  const left = new Date(next.start).getTime() - now;
+  const parts = [["days", Math.floor(left / 864e5)], ["hrs", Math.floor(left / 36e5) % 24], ["min", Math.floor(left / 6e4) % 60], ["sec", Math.floor(left / 1e3) % 60]];
+  const soon = left < 36e5 ? " soon" : ""; // last hour: digits turn red
+  const url = /^https:\/\//i.test(next.url) ? next.url : "#";
+  const when = new Date(next.start).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  $("countdown").innerHTML =
+    `<div class="cd-name">${contestTag(next)}<span>${esc(next.name)}</span></div>` +
+    `<div class="cd-clock" role="timer" aria-label="Time until ${esc(next.name)}">` +
+    parts.map(([label, value]) => `<div class="cd-unit${soon}"><b>${String(value).padStart(2, "0")}</b><span>${label}</span></div>`).join("") +
+    `</div><div class="cd-meta">${esc(when)} · ${Math.round(next.duration / 60)}m<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open ↗</a></div>`;
+}
+$("countdown").innerHTML = `<div class="loading">${spinner()}loading</div>`;
+setInterval(() => contestsData.length && renderCountdown(), 1000);
+
+// ---------- Solve heatmap ----------
+// Problems solved per day = sum of increases between consecutive snapshots, counted on the later snapshot's day.
+const HEATMAP_WEEKS = 18; // fits the narrow right column
+let heatmapData = null;
+async function loadHeatmap() {
+  const since = new Date();
+  since.setHours(0, 0, 0, 0);
+  since.setDate(since.getDate() - HEATMAP_WEEKS * 7 - 1); // one extra day as the baseline
+  const [{ data: profiles, error: profileError }, snaps] = await Promise.all([
+    supabase.from("profiles").select("id,name"),
+    (async () => {
+      const rows = [];
+      for (let from = 0; ; from += 1000) { // PostgREST caps responses at 1000 rows
+        const { data, error } = await supabase.from("snapshots").select("user_id,taken_at,solved,stats")
+          .gte("taken_at", since.toISOString()).order("taken_at").range(from, from + 999);
+        if (error) throw error;
+        rows.push(...data);
+        if (data.length < 1000) return rows;
+      }
+    })(),
+  ]);
+  if (profileError) throw profileError;
+  heatmapData = { names: new Map(profiles.map(p => [p.id, p.name])), snaps };
+  renderHeatmap();
+}
+function renderHeatmap() {
+  if (!heatmapData) return;
+  const platform = $("platform").value;
+  const solvedOf = snap => {
+    const st = snap.stats || {};
+    const lc = (st.lc_easy ?? 0) + (st.lc_medium ?? 0) + (st.lc_hard ?? 0);
+    return platform === "cf" ? st.cf_solved ?? 0 : platform === "lc" ? lc : snap.solved;
+  };
+  // Grid: HEATMAP_WEEKS full weeks ending with the current week (columns = weeks, rows = Sun..Sat).
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(today);
+  start.setDate(today.getDate() - today.getDay() - (HEATMAP_WEEKS - 1) * 7);
+  const days = Array.from({ length: HEATMAP_WEEKS * 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+  // Gains per user per day. Snapshots arrive sorted by time; each one's increase over the previous
+  // snapshot of the same user goes to its own day (a user's very first snapshot has nothing to compare to).
+  const gainsByUser = new Map(); // user -> Map(dayKey -> solved that day)
+  const lastSolved = new Map();  // user -> solved count at their previous snapshot
+  const memberNames = new Set(boardRows.map(row => row.name));
+  for (const snap of heatmapData.snaps) {
+    if (currentGroup && !memberNames.has(heatmapData.names.get(snap.user_id))) continue;
+    if (!gainsByUser.has(snap.user_id)) gainsByUser.set(snap.user_id, new Map());
+    const value = solvedOf(snap), prev = lastSolved.get(snap.user_id);
+    lastSolved.set(snap.user_id, value);
+    const taken = new Date(snap.taken_at);
+    if (prev == null || taken < start) continue;
+    const key = dayKey(taken), gains = gainsByUser.get(snap.user_id);
+    gains.set(key, (gains.get(key) ?? 0) + Math.max(0, value - prev));
+  }
+  const color = platform === "cf" ? "var(--cf)" : platform === "lc" ? "var(--lc)" : "var(--gold)";
+  const rows = [...gainsByUser].map(([userId, gains]) => {
+    let total = 0;
+    const cells = days.map(d => {
+      if (d > today) return `<i class="future"></i>`;
+      const gained = gains.get(dayKey(d)) ?? 0;
+      total += gained;
+      const level = gained === 0 ? 0 : gained < 2 ? 1 : gained < 4 ? 2 : gained < 7 ? 3 : 4;
+      const label = `${d.toLocaleDateString(undefined, { day: "numeric", month: "short" })}: ${gained} solved`;
+      return `<i data-l="${level}" title="${esc(label)}"></i>`;
+    }).join("");
+    const name = heatmapData.names.get(userId) || "Unknown";
+    return { total, html: `<div class="hm-row"><h4><span style="color:var(--fg);display:flex;align-items:center">${avatar(name)}${esc(name)}</span><span>${total} in ${HEATMAP_WEEKS}w</span></h4><div class="hm-grid">${cells}</div></div>` };
+  }).sort((a, b) => b.total - a.total);
+  $("heatmap").style.setProperty("--hm", color);
+  $("heatmap").innerHTML = (rows.map(r => r.html).join("") || `<div class="loading">no snapshots yet</div>`) +
+    `<div class="hm-foot"><span>${platform === "all" ? "All platforms" : platform === "cf" ? "Codeforces" : "LeetCode"} · fills in as snapshots are saved</span>` +
+    `<span class="hm-scale">less${[0, 1, 2, 3, 4].map(l => `<i data-l="${l}" style="background:${l ? `color-mix(in srgb, ${color} ${[0, 35, 60, 82, 100][l]}%, var(--track))` : "var(--track)"}"></i>`).join("")}more</span></div>`;
+  for (const grid of $("heatmap").querySelectorAll(".hm-grid")) grid.scrollLeft = grid.scrollWidth; // newest weeks in view
+}
+$("heatmap").innerHTML = `<div class="loading">${spinner()}loading</div>`;
+$("platform").addEventListener("change", renderHeatmap);
+
 async function loadContests() {
+  $("contests").innerHTML = loadingRow(2);
   const { data, error } = await supabase.from("contests").select("platform,name,start,duration,url")
     .gte("start", new Date().toISOString()).order("start");
   if (error) {
-    $("contests").innerHTML = "<tr><td>Contests are unavailable.</td></tr>";
+    $("contests").innerHTML = "<tr><td colspan=\"2\" class=\"empty\">contests unavailable</td></tr>";
+    $("calendar").innerHTML = `<div class="loading">calendar unavailable</div>`;
     return;
   }
+  contestsData = data;
+  if (!calSelected && data.length) calSelected = dayKey(new Date(data[0].start)); // preselect the next contest day
+  renderCalendar();
+  renderCountdown();
   $("contests").innerHTML = data.map(contest => {
     const url = /^https:\/\//i.test(contest.url) ? contest.url : "#";
-    return `<tr><td>${contest.platform === "codeforces" ? "CF" : "LC"}</td><td><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(contest.name)}</a></td>` +
-      `<td>${new Date(contest.start).toLocaleString()}</td><td class="n">${Math.round(contest.duration / 60)} min</td></tr>`;
-  }).join("") || "<tr><td>No upcoming contests.</td></tr>";
+    const cf = contest.platform === "codeforces";
+    const when = new Date(contest.start).toLocaleString(undefined, { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    return `<tr><td class="tagcell">${contestTag(contest)}</td><td><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(contest.name)}</a>` +
+      `<div class="when">${esc(when)} · ${Math.round(contest.duration / 60)}m</div></td></tr>`;
+  }).join("") || "<tr><td colspan=\"2\" class=\"empty\">no upcoming contests</td></tr>";
 }
 
 async function loadProfile(user) {
-  if (currentUser?.id !== user?.id) {
-    currentUser = user;
+  if (groupUser?.id !== user?.id) {
+    groupUser = user;
     groupsRequest++;
     membersRequest++;
     boardRequest++;
     groups = [];
     currentGroup = null;
+    boardRows = [];
+    duelToken++;
+    duelChart?.destroy();
+    duelChart = null;
+    renderBoard();
+    renderHeatmap();
     $("member-list").replaceChildren();
     $("invite-link").value = "";
     $("invite-link-label").hidden = true;
-    $("board").replaceChildren();
     setMessage("group-message", "");
     renderGroupNavigation();
   }
   updateInviteNotice();
   $("profile").hidden = !user;
   $("logout").hidden = !user;
-  $("google-login").hidden = !GOOGLE_AUTH_ENABLED || Boolean(user);
-  $("github-login").hidden = !GITHUB_AUTH_ENABLED || Boolean(user);
-  $("email-address").hidden = Boolean(user);
-  $("email-login").hidden = Boolean(user);
+  $("login").hidden = Boolean(user);
   if (!user) {
     profileLoadedFor = null;
     $("auth-status").textContent = "";
@@ -468,7 +1913,7 @@ async function loadProfile(user) {
   $("profile").open = !profile;
   const suggestedHandle = (user.email?.split("@")[0] || "").split("+")[0]
     .replace(/[^A-Za-z0-9_.-]/g, "").slice(0, 40);
-  $("name").value = profile?.name || user.user_metadata?.full_name || "";
+  $("name").value = profile?.name || user.name;
   $("codeforces").value = accounts.find(account => account.platform === "codeforces")?.handle || suggestedHandle;
   $("leetcode").value = accounts.find(account => account.platform === "leetcode")?.handle || suggestedHandle;
   updateProfileLinks();
@@ -476,16 +1921,22 @@ async function loadProfile(user) {
   setMessage("profile-message", pending.length ? `Pending verification: ${pending.join(", ")}.` : "");
 }
 
+let accountRequest = 0;
+async function refreshAccount() {
+  const request = ++accountRequest;
+  const user = currentUser();
+  await loadProfile(user);
+  if (request !== accountRequest) return;
+  await loadGroups(user);
+}
+
 async function refresh() {
-  const request = ++refreshRequest;
-  const { data: { session }, error } = await supabase.auth.getSession();
-  if (request !== refreshRequest) return;
-  if (error) showError("auth-status", error);
-  await loadProfile(session?.user || null);
-  if (request !== refreshRequest) return;
-  await Promise.all([loadGroups(session?.user || null), loadContests()]);
+  loadHeatmap().catch(() => { $("heatmap").innerHTML = `<div class="loading">heatmap unavailable</div>`; });
+  await Promise.all([refreshAccount(), loadContests()]);
   const { data: latest } = await supabase.from("snapshots").select("taken_at").order("taken_at", { ascending: false }).limit(1).maybeSingle();
-  $("updated").textContent = latest ? `Updated ${new Date(latest.taken_at).toLocaleString()}` : "No snapshots yet";
+  $("updated").textContent = latest
+    ? `Last sync ${new Date(latest.taken_at).toLocaleString(undefined, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
+    : "No snapshots yet";
 }
 
 for (const [key, label] of Object.entries(PERIODS)) {
@@ -498,41 +1949,114 @@ for (const [key, label] of Object.entries(PERIODS)) {
 
 if (!configured) {
   $("updated").textContent = "Set the Supabase project URL and anon key in this page to connect.";
-  $("google-login").disabled = true;
-  $("github-login").disabled = true;
-  $("email-login").disabled = true;
   $("board").innerHTML = "<tr><td colspan=\"6\">Supabase configuration required.</td></tr>";
   $("contests").innerHTML = "<tr><td>Supabase configuration required.</td></tr>";
 } else {
-  $("google-login").onclick = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}${window.location.pathname}` }
-    });
-    if (error) showError("auth-status", error);
-  };
-  $("github-login").onclick = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "github", options: { redirectTo: window.location.href.split("#")[0] } });
-    if (error) showError("auth-status", error);
-  };
-  $("email-login").onclick = async () => {
-    const username = $("email").value.trim();
-    if (!username) return setMessage("auth-status", "Enter your Gmail username first.");
-    if (!/^[A-Za-z0-9.]{1,30}$/.test(username)) {
-      return setMessage("auth-status", "Use only letters, numbers, and periods before @gmail.com.");
+  // ---------- 8-bit sign-in on top of Clerk's sign-in/sign-up API (no Clerk UI) ----------
+  const pageUrl = () => location.origin + location.pathname;
+  const clerkError = e => e?.errors?.[0]?.longMessage || e?.errors?.[0]?.message || e?.message || "Something went wrong.";
+  let pendingFlow = null; // { kind: "signIn" | "signUp", resource }
+  function resetSignin() {
+    pendingFlow = null;
+    $("email-form").hidden = false;
+    $("code-form").hidden = true;
+    $("si-pass-wrap").hidden = true;
+    $("si-pass").value = "";
+    setMessage("si-msg", "");
+  }
+  // Show the pixel spinner on the clicked button while `work` runs; errors land in the dialog.
+  async function busy(button, work) {
+    const label = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = spinner() + label;
+    try {
+      await work();
+    } catch (error) {
+      setMessage("si-msg", clerkError(error));
+    } finally {
+      button.disabled = false;
+      button.innerHTML = label;
     }
-    const email = `${username}@gmail.com`;
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.href.split("#")[0] } });
-    setMessage("auth-status", error ? error.message : "Sign-in link sent. Check your email.");
+  }
+  if (!REGISTRATION_OPEN) $("si-sub").textContent = "Registration is closed. Existing players only.";
+  $("login").onclick = () => {
+    resetSignin();
+    $("signin-dialog").showModal();
+    $("si-email").focus();
+  };
+  $("signin-close").onclick = () => $("signin-dialog").close();
+  $("si-back").onclick = resetSignin;
+  for (const button of document.querySelectorAll("[data-oauth]")) {
+    button.onclick = () => busy(button, () => clerk.client.signIn.authenticateWithRedirect({
+      strategy: button.dataset.oauth,
+      redirectUrl: `${pageUrl()}?sso-callback=1`,
+      redirectUrlComplete: pageUrl(),
+    }));
+  }
+  $("email-form").onsubmit = event => {
+    event.preventDefault();
+    busy(event.submitter || $("email-form").querySelector("button"), async () => {
+      const email = $("si-email").value.trim();
+      try {
+        const signIn = await clerk.client.signIn.create({ identifier: email });
+        const factor = signIn.supportedFirstFactors?.find(f => f.strategy === "email_code");
+        if (!factor) throw new Error("Email codes aren't enabled for this account. Use Google or GitHub.");
+        await signIn.prepareFirstFactor({ strategy: "email_code", emailAddressId: factor.emailAddressId });
+        pendingFlow = { kind: "signIn", resource: signIn };
+      } catch (error) {
+        if (error?.errors?.[0]?.code !== "form_identifier_not_found") throw error;
+        if (!REGISTRATION_OPEN) throw new Error("Registration is closed. Only existing players can sign in.");
+        // Unknown email: create the account with the same code step.
+        const signUp = await clerk.client.signUp.create({ emailAddress: email });
+        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+        pendingFlow = { kind: "signUp", resource: signUp };
+      }
+      $("si-sent").textContent = email;
+      $("email-form").hidden = true;
+      $("code-form").hidden = false;
+      $("si-code").value = "";
+      $("si-code").focus();
+      setMessage("si-msg", pendingFlow.kind === "signUp" ? "New player! Enter the code to create your account." : "");
+    });
+  };
+  $("code-form").onsubmit = event => {
+    event.preventDefault();
+    busy(event.submitter || $("code-form").querySelector("button[type=submit]"), async () => {
+      let result = pendingFlow.resource;
+      if (pendingFlow.kind === "signIn") {
+        result = await result.attemptFirstFactor({ strategy: "email_code", code: $("si-code").value.trim() });
+      } else {
+        if (result.verifications?.emailAddress?.status !== "verified") {
+          result = await result.attemptEmailAddressVerification({ code: $("si-code").value.trim() });
+        }
+        // If the Clerk app still requires passwords, finish sign-up with one.
+        if (result.status === "missing_requirements" && result.missingFields?.includes("password")) {
+          pendingFlow.resource = result;
+          if (!$("si-pass").value) {
+            $("si-pass-wrap").hidden = false;
+            $("si-pass").focus();
+            throw new Error("Choose a password (8+ characters) to finish creating your account.");
+          }
+          result = await result.update({ password: $("si-pass").value });
+        }
+      }
+      if (result.status !== "complete") {
+        throw new Error(`Couldn't finish (${result.status}${result.missingFields?.length ? `: ${result.missingFields.join(", ")}` : ""}).`);
+      }
+      await clerk.setActive({ session: result.createdSessionId });
+      $("signin-dialog").close();
+    });
   };
   $("logout").onclick = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) showError("auth-status", error);
-    else await refresh();
+    try {
+      await clerk.signOut();
+    } catch (error) {
+      showError("auth-status", error);
+    }
   };
   $("profile-form").onsubmit = async event => {
     event.preventDefault();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = currentUser();
     if (!user) return setMessage("profile-message", "Sign in before saving a profile.");
     const accountsToSave = [
       { platform: "codeforces", inputId: "codeforces" },
@@ -573,9 +2097,23 @@ if (!configured) {
     setMessage("profile-message", "Saved. Handle verification runs with the next stats update.");
     await Promise.all([showLeaderboard(), currentGroup ? loadGroupMembers() : Promise.resolve()]);
   };
-  // Supabase calls this under its auth lock; start queries after the callback returns.
-  supabase.auth.onAuthStateChange(() => setTimeout(() => refresh(), 0));
   refresh();
+  document.fonts?.load('8px "Press Start 2P"').then(() => boardRows.length && renderBoard());
+  if (!clerkConfigured) {
+    setMessage("auth-status", "Sign-in not configured: set CLERK_PUBLISHABLE_KEY in this page.");
+  } else {
+    loadClerk().then(async instance => {
+      clerk = instance;
+      // Returning from Google/GitHub: let Clerk finish the OAuth sign-in (it redirects back to the clean URL).
+      if (new URLSearchParams(location.search).has("sso-callback")) {
+        await clerk.handleRedirectCallback({ signInFallbackRedirectUrl: pageUrl(), signUpFallbackRedirectUrl: pageUrl() });
+      }
+      $("login").disabled = false;
+      // Token refreshes keep the same dashboard and open settings; only identity changes reload groups.
+      clerk.addListener(() => { if (currentUser()?.id !== groupUser?.id) refreshAccount(); });
+      return refreshAccount();
+    }).catch(error => showError("auth-status", error));
+  }
 }
 </script>
 </body>

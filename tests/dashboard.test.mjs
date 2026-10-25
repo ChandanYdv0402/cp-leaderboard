@@ -14,44 +14,53 @@ const browserPath = process.env.CP_BROWSER || [
 ].find(existsSync);
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-// The browser runs the actual page with a deterministic Supabase boundary. SQL/RLS
+// The browser runs the actual page with deterministic Clerk/Supabase boundaries. SQL/RLS
 // behavior is covered separately against PostgreSQL in groups.test.mjs.
 function installMock() {
-  const owner = { id: 'alice', email: 'alice@gmail.com', user_metadata: {} };
+  const owner = { id: 'alice', primaryEmailAddress: { emailAddress: 'alice@gmail.com' }, fullName: 'Alice' };
   const initialGroups = [
     { id: 'group-a', name: 'Friends <club>', owner_id: 'alice' },
     { id: 'group-b', name: 'Study group', owner_id: 'bob' },
   ];
   const state = window.mock = {
-    user: owner, groups: initialGroups, calls: [], slowGroup: false,
+    user: owner, groups: initialGroups, calls: [], charts: [], slowGroup: false,
     invitation: 'a'.repeat(32), authCallback: null,
-    async signOut() { this.user = null; this.authCallback('SIGNED_OUT', null); },
-    async signIn() { this.user = owner; this.authCallback('SIGNED_IN', { user: owner }); },
+    async signOut() { this.user = null; window.Clerk.user = null; this.authCallback(); },
+    async signIn() { this.user = owner; window.Clerk.user = owner; this.authCallback(); },
   };
   const members = [
     { user_id: 'alice', profiles: { name: 'Alice' } },
     { user_id: 'bob', profiles: { name: 'Bob' } },
   ];
   const rows = [
-    { name: 'Alice', points: 100, solved: 10, cf_rating: 1400, lc_rating: null, has_snapshot: true },
-    { name: 'Bob', points: 0, solved: 0, cf_rating: null, lc_rating: null, has_snapshot: false },
+    { name: 'Alice', points: 100, solved: 10, cf_points: 60, cf_solved: 6, lc_points: 40, lc_solved: 4, cf_rating: 1400, lc_rating: null, has_snapshot: true },
+    { name: 'Bob', points: 0, solved: 0, cf_points: 0, cf_solved: 0, lc_points: 0, lc_solved: 0, cf_rating: null, lc_rating: null, has_snapshot: false },
   ];
+  const profiles = [{ id: 'alice', name: 'Alice' }, { id: 'bob', name: 'Bob' }, { id: 'outsider', name: 'Global outsider' }];
+  const snaps = ['alice', 'outsider'].flatMap(user_id => [0, 1].map(day => ({
+    user_id, taken_at: new Date(Date.now() - (1 - day) * 864e5).toISOString(),
+    points: 50 + 50 * day, solved: 5 + 5 * day, cf_rating: 1400, lc_rating: null,
+    stats: { cf_points: 30 + 30 * day, cf_solved: 3 + 3 * day, lc_medium: 2 + 2 * day },
+  })));
+  window.Clerk = {
+    user: owner, session: { getToken: async () => 'test-token' },
+    load: async () => {}, addListener(callback) { state.authCallback = callback; },
+    signOut: () => state.signOut(),
+  };
+  window.Chart = class {
+    static defaults = { font: {}, plugins: { tooltip: {} } };
+    constructor(canvas, config) { state.charts.push({ id: canvas.id, config }); }
+    destroy() {}
+  };
   const api = {
-    auth: {
-      getSession: async () => ({ data: { session: state.user ? { user: state.user } : null } }),
-      getUser: async () => ({ data: { user: state.user } }),
-      onAuthStateChange: callback => { state.authCallback = callback; },
-      signOut: async () => { await state.signOut(); return {}; },
-      signInWithOAuth: async () => ({}), signInWithOtp: async () => ({}),
-    },
     from(table) {
       state.calls.push({ table });
       const query = {
         select() { return this; }, eq() { return this; }, gte() { return this; },
-        order() { return this; }, limit() { return this; }, upsert() { return this; }, delete() { return this; },
+        order() { return this; }, range() { return this; }, limit() { return this; }, upsert() { return this; }, delete() { return this; },
         maybeSingle() { return Promise.resolve({ data: table === 'profiles' ? { name: 'Alice' } : null }); },
         then(resolve, reject) {
-          const data = { groups: state.groups.slice(), group_members: members.slice(), accounts: [], contests: [], profiles: [] }[table];
+          const data = { groups: state.groups.slice(), group_members: members.slice(), accounts: [], contests: [], profiles, snapshots: snaps }[table];
           return Promise.resolve({ data }).then(resolve, reject);
         },
       };
@@ -61,7 +70,8 @@ function installMock() {
       state.calls.push({ rpc: name, args });
       if (name === 'leaderboard') return { data: [{ ...rows[0], name: 'Global outsider', points: 999 }] };
       if (name === 'group_leaderboard') {
-        const result = rows.map(row => ({ ...row, points: row.points * (args.days === null ? 2 : 1) }));
+        const factor = args.days === null ? 2 : 1;
+        const result = rows.map(row => ({ ...row, points: row.points * factor, cf_points: row.cf_points * factor, lc_points: row.lc_points * factor }));
         if (state.slowGroup) await new Promise(resolve => setTimeout(resolve, 150));
         return { data: result };
       }
@@ -90,7 +100,10 @@ function installMock() {
 test('group dashboard works in a real browser', { skip: !browserPath && 'Set CP_BROWSER to a Chromium browser executable.', timeout: 45000 }, async t => {
   const temp = await mkdtemp(path.join(tmpdir(), 'cp-dashboard-'));
   const html = (await readFile(new URL('../site/index.html', import.meta.url), 'utf8'))
+    .replaceAll('\r\n', '\n')
     .replace(/import \{ createClient \} from "[^"]+";/, 'const createClient = window.createClient;')
+    .replace(/async function loadClerk\(\) \{[\s\S]*?\n\}\nfunction currentUser/, 'async function loadClerk() { return window.Clerk; }\nfunction currentUser')
+    .replace(/<script defer src="https:\/\/cdnjs[^>]+><\/script>/, '')
     .replace('<script type="module">', `<script>(${installMock.toString()})()</script><script type="module">`);
   const server = createServer((_req, res) => { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.end(html); });
   server.listen(0, '127.0.0.1');
@@ -195,6 +208,23 @@ test('group dashboard works in a real browser', { skip: !browserPath && 'Set CP_
     }
   });
 
+  await t.test('platform totals, ranks, progress, duels, and heatmaps stay inside the selected group', async () => {
+    await waitFor(`document.getElementById('heatmap').textContent.includes('Alice')`);
+    assert.equal(await evaluate(`document.getElementById('heatmap').textContent.includes('Global outsider')`), false);
+    assert.equal(await evaluate(`document.getElementById('ranks').textContent.includes('Global outsider')`), false);
+    assert.deepEqual(await evaluate(`Array.from(document.getElementById('duel-a').options).map(option => option.value)`), ['Alice', 'Bob']);
+    await evaluate(`document.getElementById('platform').value = 'cf'; document.getElementById('platform').dispatchEvent(new Event('change'))`);
+    assert.equal(await evaluate(`document.getElementById('group-points').textContent`), '120');
+    await evaluate(`document.getElementById('platform').value = 'lc'; document.getElementById('platform').dispatchEvent(new Event('change'))`);
+    assert.equal(await evaluate(`document.getElementById('group-points').textContent`), '80');
+    await evaluate(`document.getElementById('platform').value = 'all'; document.getElementById('platform').dispatchEvent(new Event('change')); document.querySelector('[data-v="progress"]').click()`);
+    await waitFor(`mock.charts.filter(chart => chart.id === 'chart').at(-1)?.config.type === 'line'`);
+    assert.deepEqual(await evaluate(`mock.charts.filter(chart => chart.id === 'chart').at(-1).config.data.datasets.map(dataset => dataset.label)`), ['Alice']);
+    assert.deepEqual(await evaluate(`mock.charts.filter(chart => chart.id === 'duel-chart').at(-1).config.data.datasets.map(dataset => dataset.label)`), ['Alice', 'Bob']);
+    assert.equal(await evaluate(`document.getElementById('si-sub').textContent.includes('Registration is closed')`), true);
+    await evaluate(`document.querySelector('[data-v="standings"]').click()`);
+  });
+
   await t.test('global rankings remain selected when an older group response arrives', async () => {
     await evaluate(`mock.slowGroup = true; document.querySelector('[data-k="week"]').click(); document.getElementById('global-rankings').click()`);
     await waitFor(`document.getElementById('board').textContent.includes('Global outsider')`);
@@ -231,7 +261,7 @@ test('group dashboard works in a real browser', { skip: !browserPath && 'Set CP_
     await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
     assert.equal(await evaluate(`document.documentElement.scrollWidth <= window.innerWidth`), true);
     if (process.env.CP_QA_SCREENSHOT) {
-      const screenshot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
+      const screenshot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
       await writeFile(process.env.CP_QA_SCREENSHOT, Buffer.from(screenshot.data, 'base64'));
     }
     await evaluate(`document.getElementById('global-rankings').click(); mock.signOut()`);
