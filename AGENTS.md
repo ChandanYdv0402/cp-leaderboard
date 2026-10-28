@@ -4,10 +4,13 @@ Read this file before making project changes. Keep it current so the next assist
 
 ## Project
 
-CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standings and upcoming contests. Supabase is being introduced for authentication, user profiles, linked handles, snapshots, and contests. GitHub Actions runs the Rust collector every six hours.
+CP Leaderboard is a static GitHub Pages site for Codeforces, LeetCode, and CodeChef standings and upcoming contests. Supabase stores profiles, linked handles, snapshots, contests, and invitation-only groups. GitHub Actions runs the Rust collector every six hours.
 
 ## Current Progress
 
+- Added CodeChef profile handles/URLs, rating/star tiers, platform standings, charts, heatmaps, duels, group totals, and upcoming contests. CodeChef scores 10 points per solved problem. `src/platforms.rs` fetches public profile HTML and the official site's contest feed; stats are committed only after a successful fetch, and old snapshot JSON defaults the new fields.
+- Added rerunnable `supabase/migrations/202610280001_codechef.sql`, appended to the fresh schema. It expands the account platform constraint and global/group RPCs without rewriting historical snapshots. CodeChef fields stay in `stats` JSON, so deploying the collector before applying the migration does not break existing snapshot writes. Groups are optional; run the CodeChef migration last or rerun it after adding groups.
+- CodeChef database/browser coverage passes locally (22 checks, including group isolation, upgrade ordering, migration reruns, profile URLs, and 320/390px layouts). Added Rust parser/scoring/backward-compatibility tests and the `checks` Actions workflow. Public CodeChef profile/contest HTTP formats were inspected successfully. Full local Rust tests are blocked by Windows application control on generated build scripts and a missing GNU `dlltool`; a temporary Rust toolchain is under `%TEMP%/cp-codechef-rust`, and Rust formatting checks can run.
 - Pushed groups to `main` in merge commit `dbc80d5`, preserving the newer Clerk, themes, registration restriction, and dashboard features. Pages run `40214439859` succeeded; production returned HTTP 200 with group navigation, Clerk, closed registration, and the duel arena present. The hosted groups migration remains pending.
 - Added invitation-only groups and merged with the newer `main` dashboard: create/join flows, owner invitations with rotation, removal, leaving/deletion, remembered per-user dashboard selection, and a separate global rankings option. Group selection also scopes ranks, progress charts, duels, and heatmaps; platform filters apply to group totals. Existing profile editing is collapsed; new profiles open for setup.
 - Added group tables, member-only RLS, owner-checked RPCs, and `group_leaderboard` to `supabase/schema.sql` and `supabase/migrations/202610250001_groups.sql`. Group ids are UUIDs; user ids are Clerk text JWT subjects. Existing projects need the Clerk and per-platform migrations first. The collector is unchanged. Invitations persist across sign-in tabs until joined or dismissed; closed registration remains enforced.
@@ -51,6 +54,7 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 
 ## Current Blockers / Unverified
 
+- The CodeChef migration has not been applied to hosted Supabase. Until it is, CodeChef linking and its leaderboard fields are unavailable. Live signed-in CodeChef linking/collection remains unverified; Rust compilation/tests await Linux CI because local Windows application control blocks build scripts.
 - The groups migration has not been applied to hosted Supabase. Apply `supabase/migrations/202610250001_groups.sql` once after the Clerk/per-platform prerequisites; fresh projects use the full schema instead. Until then, the UI falls back to global rankings. Verify group access, invitations, and owner actions with separate real accounts after rollout.
 - Supabase Auth (Google OAuth / email OTP) is no longer used by the site; login providers are now configured in Clerk. Clerk sign-in, token acceptance by Supabase, and RLS writes with Clerk ids are untested.
 - No users have signed up or connected handles yet, so per-user snapshots and handle verification remain untested.
@@ -58,6 +62,8 @@ CP Leaderboard is a static GitHub Pages site for Codeforces and LeetCode standin
 - Local HTTP preview is available at `http://localhost:8000/` in the current session; it uses a PowerShell server because Python is unavailable.
 
 ## Next Steps
+
+0. Run `supabase/migrations/202610280001_codechef.sql` after any groups migration, link a CodeChef handle, and run the collector. Verify all/group periods and CodeChef contests; check the new `checks` workflow for Rust test/live-source outcomes.
 
 1. Verify Clerk's Supabase integration, third-party auth, and the existing Clerk/per-platform database migrations. Clerk sign-in end to end remains untested.
 2. Apply the groups migration once, then verify invitations, outsider isolation, rotation/removal, leaving/deletion, and group/global standings with separate real accounts. Invitations do not reopen registration.

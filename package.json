@@ -2,7 +2,7 @@
   "name": "cp-leaderboard-checks",
   "private": true,
   "scripts": {
-    "test": "node --test tests/groups.test.mjs tests/dashboard.test.mjs"
+    "test": "node --test tests/groups.test.mjs tests/codechef.test.mjs tests/dashboard.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.11"

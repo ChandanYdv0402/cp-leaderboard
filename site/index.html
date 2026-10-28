@@ -16,7 +16,7 @@
     --bg:#070707; --panel:#121212; --head:#1a1a1a; --row:#0f0f0f; --hover:#1c1c1c;
     --fg:#f5f5f5; --muted:#a3a3a3; --faint:#6b6b6b; --line:#262626; --rail:rgba(255,255,255,.1);
     --primary:#e4e4e4; --primary-fg:#121212; --ring:#737373;
-    --cf:#5fa8d3; --lc:#e0a43a; --all:#c9c9c9; --gold:#d4b33a; --hot:#ff4d4d;
+    --cf:#5fa8d3; --lc:#e0a43a; --cc:#bc8f68; --all:#c9c9c9; --gold:#d4b33a; --hot:#ff4d4d;
     --sel:#262626; --track:#1a1a1a; --track-2:#222;
     --pixel:"Press Start 2P", ui-monospace, monospace;
     --text:ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -222,13 +222,13 @@
   tr.first td.rank { color:var(--gold); } tr.second td.rank { color:#c0c6cf; } tr.third td.rank { color:#c98a55; }
   td.empty { color:var(--faint); text-align:center; padding:20px; font:13.5px/1.6 var(--pixel); }
   .tag { display:inline-block; font:11.5px/1 var(--pixel); padding:4px 5px 3px; color:#0b0b0b; }
-  .tag.cf { background:var(--cf); } .tag.lc { background:var(--lc); }
+  .tag.cf { background:var(--cf); } .tag.lc { background:var(--lc); } .tag.cc { background:var(--cc); }
   td.when, .contest-list .when { color:var(--muted); white-space:nowrap; font-family:var(--chart-font); font-size:15px; }
   .contest-list .when { margin-top:4px; white-space:normal; }
   .contest-list .tagcell { width:3.2em; vertical-align:top; padding-top:11px; }
 
   /* Profile form */
-  .profile form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)) auto; gap:16px; align-items:end; }
+  .profile form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; align-items:end; }
   label { display:grid; gap:8px; color:var(--muted); font:13.5px/1.4 var(--pixel); letter-spacing:.5px; }
   input { min-width:0; padding:8px 10px; margin:3px; background:var(--track); border:0; border-radius:0; font:14px/1.4 var(--pixel); letter-spacing:.5px;
     box-shadow:0 -3px 0 0 var(--ring), 0 3px 0 0 var(--ring), -3px 0 0 0 var(--ring), 3px 0 0 0 var(--ring); }
@@ -383,6 +383,9 @@
   .cal-cell.sel { outline:2px solid var(--ring); outline-offset:-2px; }
   .marks { display:flex; gap:3px; height:5px; }
   .marks b { width:5px; height:5px; } .marks .cf { background:var(--cf); } .marks .lc { background:var(--lc); }
+  .marks .cc { background:var(--cc); }
+  .cal-legend { flex-wrap:wrap; }
+  .rank-card .party > :last-child:nth-child(3) { grid-column:1 / -1; }
   .cal-legend { display:flex; gap:14px; margin-top:12px; color:var(--faint); font:11.5px/1 var(--pixel); }
   .cal-legend b { display:inline-block; width:7px; height:7px; margin-right:6px; vertical-align:-1px; }
   .cal-day { margin-top:14px; font-size:15px; }
@@ -436,12 +439,19 @@
   #group-message { margin:8px 6px 16px; }
   #profile form { margin-top:18px; }
   .awaiting-stats { display:block; color:var(--muted); font:11px/1.5 var(--text); margin-top:4px; }
+  .board-table { overflow-x:auto; max-width:100%; }
+  .chart-wrap canvas, .duel-chart canvas { max-width:100%; }
+  .dashboard-nav .text-button { flex:0 0 auto; white-space:nowrap; }
   @media(max-width:600px) {
     .group-forms { grid-template-columns:1fr; }
     .dashboard-nav { gap:10px; }
     .dashboard-nav select { font-size:11px; }
     .dashboard-nav .text-button { font-size:9px; }
     .member-list li { align-items:flex-start; flex-wrap:wrap; }
+    .group-actions .btn { max-width:100%; white-space:normal; }
+    .filters { width:100%; min-width:0; margin-left:0; }
+    .filters label { width:100%; min-width:0; white-space:normal; justify-content:space-between; }
+    .filters select { min-width:0; flex:1; max-width:160px; font-size:11px; }
   }
 
 
@@ -553,6 +563,7 @@
     <label>Name<input id="name" required minlength="2" maxlength="32" autocomplete="nickname"></label>
     <label>Codeforces<input id="codeforces" maxlength="200" autocomplete="off" placeholder="handle or profile URL"><a class="profile-link" id="codeforces-link" target="_blank" rel="noopener noreferrer" hidden>Open profile ↗</a></label>
     <label>LeetCode<input id="leetcode" maxlength="200" autocomplete="off" placeholder="username or profile URL"><a class="profile-link" id="leetcode-link" target="_blank" rel="noopener noreferrer" hidden>Open profile ↗</a></label>
+    <label>CodeChef<input id="codechef" maxlength="200" autocomplete="off" placeholder="handle or profile URL"><a class="profile-link" id="codechef-link" target="_blank" rel="noopener noreferrer" hidden>Open profile ↗</a></label>
     <button class="btn" id="save-profile" type="submit">Save</button>
   </form>
   <p class="message" id="profile-message" aria-live="polite"></p>
@@ -584,6 +595,7 @@
         <option value="all">All</option>
         <option value="lc">LeetCode</option>
         <option value="cf">Codeforces</option>
+        <option value="cc">CodeChef</option>
       </select>
     </label>
     <label>Sort:
@@ -602,7 +614,7 @@
 </div>
 <div class="chart-wrap screen" id="chart-wrap"><canvas id="chart" aria-label="Leaderboard chart"></canvas></div>
 <p class="chart-note" id="chart-note" hidden></p>
-<table><thead><tr><th class="rank">#</th><th>Name</th><th class="n">Points</th><th class="n">Solved</th><th class="n" id="cf-head">CF</th><th class="n" id="lc-head">LC</th></tr></thead><tbody id="board"></tbody></table>
+<div class="board-table"><table><thead><tr><th class="rank">#</th><th>Name</th><th class="n">Points</th><th class="n">Solved</th><th class="n" id="cf-head">CF</th><th class="n" id="lc-head">LC</th><th class="n" id="cc-head">CC</th></tr></thead><tbody id="board"></tbody></table></div>
 </section>
 <section class="panel">
 <h2 class="panel-title">Ranks</h2>
@@ -621,7 +633,7 @@
 </div>
 </main>
 <footer class="statusbar">
-  <span>Scoring: CF rating/100 · LC 5/10/20</span>
+  <span>Scoring: CF rating/100 · LC 5/10/20 · CC 10/solve</span>
   <span>Keys: <kbd>w</kbd> <kbd>b</kbd> <kbd>m</kbd> <kbd>a</kbd> period · <kbd>s</kbd> <kbd>p</kbd> chart · <kbd>d</kbd> duel · <kbd>t</kbd> theme</span>
   <span><a href="https://github.com/ChandanYdv0402/cp-leaderboard" target="_blank" rel="noopener noreferrer">Source ↗</a></span>
 </footer>
@@ -660,6 +672,13 @@ const CLERK_JS_URL = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.
 // supabase/close_registration.sql) to let new people join again.
 const REGISTRATION_OPEN = false;
 const PERIODS = { week: "Weekly", biweek: "Bi-weekly", month: "Monthly", all: "All-time" };
+const PLATFORMS = {
+  cf: { id: "codeforces", name: "Codeforces", host: "codeforces.com", route: /^\/profile\/([^/]+)\/?$/i, prefix: "https://codeforces.com/profile/" },
+  lc: { id: "leetcode", name: "LeetCode", host: "leetcode.com", route: /^\/u\/([^/]+)\/?$/i, prefix: "https://leetcode.com/u/" },
+  cc: { id: "codechef", name: "CodeChef", host: "codechef.com", route: /^\/users\/([^/]+)\/?$/i, prefix: "https://www.codechef.com/users/" }
+};
+const platformKeys = Object.keys(PLATFORMS);
+const platformKey = id => platformKeys.find(key => PLATFORMS[key].id === id);
 const esc = s => String(s ?? "–").replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
 const configured = !SUPABASE_URL.includes("YOUR_PROJECT") && !SUPABASE_ANON_KEY.includes("YOUR_SUPABASE");
 const clerkConfigured = !CLERK_PUBLISHABLE_KEY.startsWith("YOUR_");
@@ -887,7 +906,7 @@ $("brand-icon").innerHTML = pixelArt(TROPHY, TROPHY_COLORS, 1.5);
 $("hero").innerHTML =
   `<div class="side" title="Codeforces · Legendary GM">${sprite("Legendary GM", 4)}</div>` +
   `<div class="hero-center"><div class="bob">${pixelArt(TROPHY, TROPHY_COLORS, 6)}</div>` +
-  `<h2>CP LEADERBOARD</h2><p>Codeforces × LeetCode · weekly · bi-weekly · monthly</p></div>` +
+  `<h2>CP LEADERBOARD</h2><p>Codeforces × LeetCode × CodeChef · weekly · bi-weekly · monthly</p></div>` +
   `<div class="side" title="LeetCode · Guardian">${sprite("Guardian", 4)}</div>`;
 
 // Next-sync progress: the fetcher runs on cron "0 */6 * * *" (UTC), i.e. every 6h from epoch.
@@ -907,43 +926,48 @@ const CF_TIERS = [
 ];
 // LeetCode only names Knight and Guardian (set by contest percentile), so these cut-offs are approximate.
 const LC_TIERS = [[0, "Novice", "#9e9e9e"], [1500, "Squire", "#6abf69"], [1850, "Knight", "#5fa8d3"], [2150, "Guardian", "#e0a43a"]];
+// CodeChef star tiers use existing party characters; their fourth field chooses the sprite.
+const CC_TIERS = [[0, "1 star", "#9e9e9e", "Newbie"], [1400, "2 stars", "#6abf69", "Pupil"],
+  [1600, "3 stars", "#5fa8d3", "Specialist"], [1800, "4 stars", "#b36bff", "Expert"],
+  [2000, "5 stars", "#e0a43a", "Master"], [2200, "6 stars", "#ff9f1a", "Grandmaster"], [2500, "7 stars", "#ff4040", "Legendary GM"]];
 function tierOf(tiers, rating) {
   if (rating == null) return null;
   const i = tiers.findLastIndex(t => rating >= t[0]);
-  const [floor, name, color] = tiers[i], next = tiers[i + 1];
-  return { name, color, next: next?.[0], nextName: next?.[1], pct: next ? (rating - floor) / (next[0] - floor) : 1 };
+  const [floor, name, color, spriteName = name] = tiers[i], next = tiers[i + 1];
+  return { name, color, spriteName, next: next?.[0], nextName: next?.[1], pct: next ? (rating - floor) / (next[0] - floor) : 1 };
 }
 // The tier a player is shown as: the given platform's, or for "all" whichever rating is higher.
-function playerTier(cf, lc, platform = "all") {
-  if (platform === "cf") return tierOf(CF_TIERS, cf);
-  if (platform === "lc") return tierOf(LC_TIERS, lc);
-  return (cf ?? -1) >= (lc ?? -1) ? tierOf(CF_TIERS, cf) : tierOf(LC_TIERS, lc);
+function playerTier(cf, lc, platform = "all", cc = null) {
+  const choices = [{ key: "cf", rating: cf, tiers: CF_TIERS }, { key: "lc", rating: lc, tiers: LC_TIERS }, { key: "cc", rating: cc, tiers: CC_TIERS }];
+  const selected = platform === "all" ? choices.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))[0] : choices.find(choice => choice.key === platform);
+  const tier = selected && tierOf(selected.tiers, selected.rating);
+  return tier ? { ...tier, platform: selected.key.toUpperCase(), rating: selected.rating } : null;
 }
 // Avatar: the tier character's portrait, or the name identicon while unrated.
-const playerAvatar = (name, cf, lc, platform) => { const t = playerTier(cf, lc, platform); return t ? portrait(t.name) : avatar(name); };
+const playerAvatar = (name, cf, lc, platform, cc) => { const t = playerTier(cf, lc, platform, cc); return t ? portrait(t.spriteName) : avatar(name); };
 // One party slot: platform + tier, rating / next, XP bar, then the full character.
 function heroSlot(label, tiers, rating) {
   const t = tierOf(tiers, rating);
   if (!t) return `<div class="hero-slot unrated" style="--c:var(--faint)"><div class="slot-head"><span>${label} Unrated</span><span>–</span></div>` +
-    `<div class="xp"><i></i></div><div class="slot-art">${sprite(tiers[0][1])}</div></div>`;
+    `<div class="xp"><i></i></div><div class="slot-art">${sprite(tiers[0][3] || tiers[0][1])}</div></div>`;
   const r = Math.round(rating);
   const title = t.next ? `${t.next - r} rating to ${t.nextName}` : "Top tier";
   return `<div class="hero-slot" style="--c:${t.color}" title="${esc(title)}">` +
     `<div class="slot-head"><span>${label} <b>${t.name}</b></span><span>${t.next ? `${r}/${t.next}` : `${r} max`}</span></div>` +
     `<div class="xp"><i style="--p:${Math.min(1, Math.max(0, t.pct)).toFixed(3)}"></i></div>` +
-    `<div class="slot-art">${sprite(t.name)}</div></div>`;
+    `<div class="slot-art">${sprite(t.spriteName)}</div></div>`;
 }
 function renderRanks() {
-  const best = r => Math.max(r.cf_rating ?? 0, r.lc_rating ?? 0);
+  const best = r => Math.max(r.cf_rating ?? 0, r.lc_rating ?? 0, r.cc_rating ?? 0);
   $("ranks").innerHTML = [...boardRows].sort((a, b) => best(b) - best(a)).map(r =>
-    `<div class="rank-card screen"><h3>${playerAvatar(r.name, r.cf_rating, r.lc_rating)}${esc(r.name)}</h3>` +
-    `<div class="party">${heroSlot("CF", CF_TIERS, r.cf_rating)}${heroSlot("LC", LC_TIERS, r.lc_rating)}</div></div>`
+    `<div class="rank-card screen"><h3>${playerAvatar(r.name, r.cf_rating, r.lc_rating, "all", r.cc_rating)}${esc(r.name)}</h3>` +
+    `<div class="party">${heroSlot("CF", CF_TIERS, r.cf_rating)}${heroSlot("LC", LC_TIERS, r.lc_rating)}${heroSlot("CC", CC_TIERS, r.cc_rating)}</div></div>`
   ).join("") || `<div class="loading">no players yet</div>`;
 }
 function renderLegend() {
   const list = tiers => tiers.map((t, i) =>
-    `<li>${sprite(t[1], 1, "sprite-sm")}<span style="color:${t[2]}">${t[1]}</span><span>${t[0]}${tiers[i + 1] ? `–${tiers[i + 1][0] - 1}` : "+"}</span></li>`).join("");
-  $("legend").innerHTML = `<h4>Codeforces</h4><ul>${list(CF_TIERS)}</ul><h4>LeetCode</h4><ul>${list(LC_TIERS)}</ul>` +
+    `<li>${sprite(t[3] || t[1], 1, "sprite-sm")}<span style="color:${t[2]}">${t[1]}</span><span>${t[0]}${tiers[i + 1] ? `–${tiers[i + 1][0] - 1}` : "+"}</span></li>`).join("");
+  $("legend").innerHTML = `<h4>Codeforces</h4><ul>${list(CF_TIERS)}</ul><h4>LeetCode</h4><ul>${list(LC_TIERS)}</ul><h4>CodeChef</h4><ul>${list(CC_TIERS)}</ul>` +
     `<p>The XP bar fills from your tier's floor to the next tier. LeetCode tiers are approximate.</p>`;
 }
 renderLegend();
@@ -954,7 +978,7 @@ let contestsData = [];
 let calMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let calSelected = null;
 const dayKey = d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-const contestTag = c => c.platform === "codeforces" ? `<span class="tag cf">CF</span>` : `<span class="tag lc">LC</span>`;
+const contestTag = c => { const key = platformKey(c.platform); return key ? `<span class="tag ${key}">${key.toUpperCase()}</span>` : ""; };
 function renderCalendar() {
   const byDay = new Map();
   for (const c of contestsData) {
@@ -971,9 +995,9 @@ function renderCalendar() {
   for (let i = 0; i < cellCount; i++) {
     const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
     const key = dayKey(d), list = byDay.get(key) || [];
-    const kinds = [...new Set(list.map(c => c.platform === "codeforces" ? "cf" : "lc"))];
+    const kinds = [...new Set(list.map(c => platformKey(c.platform)).filter(Boolean))];
     const cls = ["cal-cell", d.getMonth() !== first.getMonth() && "out", key === today && "today", list.length && "has", key === calSelected && "sel"].filter(Boolean).join(" ");
-    const title = list.map(c => `${c.platform === "codeforces" ? "CF" : "LC"} · ${c.name}`).join("\n");
+    const title = list.map(c => `${platformKey(c.platform)?.toUpperCase() || c.platform} · ${c.name}`).join("\n");
     cells += `<button type="button" class="${cls}" data-k="${key}" ${list.length ? `title="${esc(title)}"` : 'tabindex="-1"'}>` +
       `<span>${d.getDate()}</span><span class="marks">${kinds.map(k => `<b class="${k}"></b>`).join("")}</span></button>`;
   }
@@ -982,7 +1006,7 @@ function renderCalendar() {
     `<span>${first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</span>` +
     `<button type="button" class="cal-nav" data-d="1" aria-label="Next month">›</button></div>` +
     `<div class="cal-grid">${["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(d => `<span class="dow">${d}</span>`).join("")}${cells}</div>` +
-    `<div class="cal-legend"><span><b style="background:var(--cf)"></b>Codeforces</span><span><b style="background:var(--lc)"></b>LeetCode</span></div>`;
+    `<div class="cal-legend">${platformKeys.map(key => `<span><b style="background:var(--${key})"></b>${PLATFORMS[key].name}</span>`).join("")}</div>`;
   const list = calSelected && byDay.get(calSelected);
   $("cal-day").innerHTML = list?.length
     ? `<h4>${new Date(list[0].start).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</h4><ul>` +
@@ -1007,7 +1031,7 @@ const HANDLE_PATTERN = /^[A-Za-z0-9_.-]{1,40}$/;
 function handleFromProfileInput(platform, value) {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
-  const isProfileUrl = /^(?:https?:\/\/)?(?:www\.)?(?:codeforces\.com|leetcode\.com)\//i.test(raw);
+  const isProfileUrl = /^(?:https?:\/\/)?(?:www\.)?(?:codeforces\.com|leetcode\.com|codechef\.com)\//i.test(raw);
   if (!isProfileUrl) return raw;
   let url;
   try {
@@ -1015,10 +1039,9 @@ function handleFromProfileInput(platform, value) {
   } catch {
     return null;
   }
-  const expectedHost = platform === "codeforces" ? "codeforces.com" : "leetcode.com";
-  if (url.hostname.toLowerCase().replace(/^www\./, "") !== expectedHost) return null;
-  const route = platform === "codeforces" ? /^\/profile\/([^/]+)\/?$/i : /^\/u\/([^/]+)\/?$/i;
-  const match = url.pathname.match(route);
+  const config = PLATFORMS[platformKey(platform)];
+  if (!config || url.hostname.toLowerCase().replace(/^www\./, "") !== config.host) return null;
+  const match = url.pathname.match(config.route);
   if (!match) return null;
   try {
     return decodeURIComponent(match[1]);
@@ -1027,24 +1050,22 @@ function handleFromProfileInput(platform, value) {
   }
 }
 function updateProfileLinks() {
-  const codeforces = handleFromProfileInput("codeforces", $("codeforces").value);
-  const leetcode = handleFromProfileInput("leetcode", $("leetcode").value);
-  const codeforcesValid = typeof codeforces === "string" && HANDLE_PATTERN.test(codeforces);
-  const leetcodeValid = typeof leetcode === "string" && HANDLE_PATTERN.test(leetcode);
-  $("codeforces-link").hidden = !codeforcesValid;
-  $("leetcode-link").hidden = !leetcodeValid;
-  if (codeforcesValid) $("codeforces-link").href = `https://codeforces.com/profile/${encodeURIComponent(codeforces)}`;
-  if (leetcodeValid) $("leetcode-link").href = `https://leetcode.com/u/${encodeURIComponent(leetcode)}/`;
+  for (const config of Object.values(PLATFORMS)) {
+    const handle = handleFromProfileInput(config.id, $(config.id).value);
+    const valid = typeof handle === "string" && HANDLE_PATTERN.test(handle);
+    $(config.id + "-link").hidden = !valid;
+    if (valid) $(config.id + "-link").href = config.prefix + encodeURIComponent(handle) + (config.id === "leetcode" ? "/" : "");
+  }
 }
 function normalizeHandleField(platform, inputId) {
   const handle = handleFromProfileInput(platform, $(inputId).value);
   if (typeof handle === "string" && HANDLE_PATTERN.test(handle)) $(inputId).value = handle;
   updateProfileLinks();
 }
-$("codeforces").addEventListener("input", updateProfileLinks);
-$("codeforces").addEventListener("blur", () => normalizeHandleField("codeforces", "codeforces"));
-$("leetcode").addEventListener("input", updateProfileLinks);
-$("leetcode").addEventListener("blur", () => normalizeHandleField("leetcode", "leetcode"));
+for (const { id } of Object.values(PLATFORMS)) {
+  $(id).addEventListener("input", updateProfileLinks);
+  $(id).addEventListener("blur", () => normalizeHandleField(id, id));
+}
 async function loadClerk() {
   await new Promise((resolve, reject) => {
     const script = document.createElement("script");
@@ -1291,13 +1312,13 @@ async function showLeaderboard(period = currentPeriod) {
   const groupId = currentGroup;
   currentPeriod = period;
   [...$("tabs").children].forEach(button => button.classList.toggle("on", button.dataset.k === period));
-  $("board").innerHTML = loadingRow(6);
+  $("board").innerHTML = loadingRow(7);
   const days = { week: 7, biweek: 14, month: 30, all: null }[period];
   if (groupId) for (const id of ["group-points", "group-solved"]) $(id).textContent = "—";
   const { data, error } = await supabase.rpc(groupId ? "group_leaderboard" : "leaderboard", groupId ? { target_group: groupId, days } : { days });
   if (request !== boardRequest || groupId !== currentGroup) return;
   if (error) {
-    $("board").innerHTML = "<tr><td colspan=\"6\" class=\"empty\">leaderboard unavailable</td></tr>";
+    $("board").innerHTML = "<tr><td colspan=\"7\" class=\"empty\">leaderboard unavailable</td></tr>";
     return showError("group-message", error);
   }
   boardRows = data;
@@ -1309,28 +1330,28 @@ async function showLeaderboard(period = currentPeriod) {
 function renderBoard() {
   const platform = $("platform").value;
   const sort = $("sort").value;
-  $("cf-head").hidden = platform === "lc";
-  $("lc-head").hidden = platform === "cf";
+  const visiblePlatforms = platform === "all" ? platformKeys : [platform];
+  for (const key of platformKeys) $(key + "-head").hidden = !visiblePlatforms.includes(key);
   const rows = boardRows.map(row => {
-    const pick = (cf, lc, all) => platform === "cf" ? cf : platform === "lc" ? lc : all;
+    const pick = metric => platform === "all" ? row[metric] : row[`${platform}_${metric}`];
     return {
       name: row.name,
       raw: row,
       cf_rating: row.cf_rating,
       lc_rating: row.lc_rating,
+      cc_rating: row.cc_rating,
       // Per-platform fields come from the updated leaderboard() SQL; "–" until it is installed.
-      points: pick(row.cf_points, row.lc_points, row.points),
-      solved: pick(row.cf_solved, row.lc_solved, row.solved),
-      rating: pick(row.cf_rating, row.lc_rating, Math.max(row.cf_rating ?? -1, row.lc_rating ?? -1)),
+      points: pick("points"),
+      solved: pick("solved"),
+      rating: platform === "all" ? Math.max(row.cf_rating ?? -1, row.lc_rating ?? -1, row.cc_rating ?? -1) : pick("rating"),
     };
   });
   const key = r => (sort === "rating" ? r.rating : r[sort]) ?? -1;
   rows.sort((a, b) => key(b) - key(a) || (b.points ?? 0) - (a.points ?? 0));
-  const cols = 4 + (platform === "all" ? 2 : 1);
+  const cols = 4 + visiblePlatforms.length;
   $("board").innerHTML = rows.map((row, index) =>
-    `<tr class="${["first", "second", "third"][index] ?? ""}"><td class="rank">${String(index + 1).padStart(2, "0")}</td><td class="name">${playerAvatar(row.name, row.cf_rating, row.lc_rating, platform)}${esc(row.name)}${row.raw.has_snapshot === false ? '<span class="awaiting-stats">awaiting stats</span>' : ""}</td><td class="n">${esc(row.points)}</td><td class="n">${esc(row.solved)}</td>` +
-    (platform !== "lc" ? `<td class="n">${esc(row.cf_rating)}</td>` : "") +
-    (platform !== "cf" ? `<td class="n">${esc(row.lc_rating)}</td>` : "") + "</tr>").join("") ||
+    `<tr class="${["first", "second", "third"][index] ?? ""}"><td class="rank">${String(index + 1).padStart(2, "0")}</td><td class="name">${playerAvatar(row.name, row.cf_rating, row.lc_rating, platform, row.cc_rating)}${esc(row.name)}${row.raw.has_snapshot === false ? '<span class="awaiting-stats">awaiting stats</span>' : ""}</td><td class="n">${esc(row.points)}</td><td class="n">${esc(row.solved)}</td>` +
+    visiblePlatforms.map(key => `<td class="n">${esc(row.raw[key + "_rating"])}</td>`).join("") + "</tr>").join("") ||
     `<tr><td colspan="${cols}" class="empty">no entries yet</td></tr>`;
   $("user-count").textContent = `${boardRows.length} user${boardRows.length === 1 ? "" : "s"}`;
   if (currentGroup) {
@@ -1356,7 +1377,7 @@ function cssColor(name) {
   const [r, g, b, a] = colorProbe.getImageData(0, 0, 1, 1).data;
   return `rgba(${r},${g},${b},${(a / 255).toFixed(3)})`;
 }
-const CHART_COLORS = { cf: cssColor("--cf"), lc: cssColor("--lc"), all: cssColor("--all") };
+const CHART_COLORS = { cf: cssColor("--cf"), lc: cssColor("--lc"), cc: cssColor("--cc"), all: cssColor("--all") };
 function chartTheme() {
   // Pixel font axes, square marks and a flat bordered tooltip, like the 8-bit Chart component.
   window.Chart.defaults.font.family = cssVar("--pixel");
@@ -1408,20 +1429,18 @@ function renderChart(rows, platform, sort) {
   if (chartView === "progress") return renderProgress(platform, sort, chartToken);
   $("chart-wrap").hidden = !rows.length || !window.Chart;
   if ($("chart-wrap").hidden) return;
-  const [cfKey, lcKey] = { points: ["cf_points", "lc_points"], solved: ["cf_solved", "lc_solved"], rating: ["cf_rating", "lc_rating"] }[sort];
   // Older leaderboard() without per-platform columns: fall back to one combined series.
-  const split = sort === "rating" || rows[0].raw[cfKey] !== undefined;
+  const split = sort === "rating" || rows[0].raw.cf_points !== undefined;
   const series = (label, key, color) => ({ label, data: rows.map(r => r.raw[key] ?? 0), backgroundColor: color, borderRadius: 0, barPercentage: 0.7, categoryPercentage: 0.85 });
-  const tierColors = rows.map(r => playerTier(r.cf_rating, r.lc_rating, platform)?.color ?? CHART_COLORS.all);
+  const tierColors = rows.map(r => playerTier(r.cf_rating, r.lc_rating, platform, r.cc_rating)?.color ?? CHART_COLORS.all);
   const datasets = !split ? [series("All", sort, tierColors)] : [
-    ...(platform !== "lc" ? [series("Codeforces", cfKey, CHART_COLORS.cf)] : []),
-    ...(platform !== "cf" ? [series("LeetCode", lcKey, CHART_COLORS.lc)] : []),
+    ...(platform === "all" ? platformKeys : [platform]).map(key => series(PLATFORMS[key].name, `${key}_${sort}`, CHART_COLORS[key])),
   ];
   const stacked = sort !== "rating";
   const barRows = stacked ? 1 : datasets.length;
   $("chart-wrap").style.height = `${Math.max(160, rows.length * 46 * barRows + 100)}px`;
   const axis = chartTheme();
-  const portraits = rows.map(r => { const t = playerTier(r.cf_rating, r.lc_rating, platform); return t && portraitCanvas(t.name, 2); });
+  const portraits = rows.map(r => { const t = playerTier(r.cf_rating, r.lc_rating, platform, r.cc_rating); return t && portraitCanvas(t.spriteName, 2); });
   chart = new window.Chart($("chart"), {
     type: "bar",
     data: { labels: rows.map(r => r.name), datasets },
@@ -1465,15 +1484,16 @@ async function loadProgress(period) {
 }
 function snapshotValue(snap, platform, sort) {
   const st = snap.stats || {};
+  const ccRating = snap.cc_rating ?? st.cc_rating ?? null;
   const lcSolved = (st.lc_easy ?? 0) + (st.lc_medium ?? 0) + (st.lc_hard ?? 0);
   const lcPoints = 5 * (st.lc_easy ?? 0) + 10 * (st.lc_medium ?? 0) + 20 * (st.lc_hard ?? 0);
   if (sort === "rating") {
-    if (platform !== "all") return platform === "cf" ? snap.cf_rating : snap.lc_rating;
-    const best = Math.max(snap.cf_rating ?? -Infinity, snap.lc_rating ?? -Infinity);
+    if (platform !== "all") return { cf: snap.cf_rating, lc: snap.lc_rating, cc: ccRating }[platform];
+    const best = Math.max(snap.cf_rating ?? -Infinity, snap.lc_rating ?? -Infinity, ccRating ?? -Infinity);
     return Number.isFinite(best) ? best : null;
   }
-  if (sort === "solved") return platform === "cf" ? st.cf_solved ?? 0 : platform === "lc" ? lcSolved : snap.solved;
-  return platform === "cf" ? st.cf_points ?? 0 : platform === "lc" ? lcPoints : snap.points;
+  if (sort === "solved") return { cf: st.cf_solved ?? 0, lc: lcSolved, cc: st.cc_solved ?? 0, all: snap.solved }[platform];
+  return { cf: st.cf_points ?? 0, lc: lcPoints, cc: (st.cc_solved ?? 0) * 10, all: snap.points }[platform];
 }
 async function renderProgress(platform, sort, token) {
   let data;
@@ -1506,12 +1526,12 @@ async function renderProgress(platform, sort, token) {
     const color = LINE_COLORS[i % LINE_COLORS.length];
     const name = data.names.get(userId) || "Unknown";
     const row = boardRows.find(r => r.name === name);
-    const tier = row && playerTier(row.cf_rating, row.lc_rating, platform);
+    const tier = row && playerTier(row.cf_rating, row.lc_rating, platform, row.cc_rating);
     const last = points.length - 1;
     return { label: name, data: points.map(p => ({ x: p.x, y: p.y - base })),
       borderColor: color, backgroundColor: color + "12", pointBackgroundColor: color, pointBorderColor: color,
       fill: "origin", stepped: "before", borderWidth: 3,
-      pointStyle: points.map((_, j) => j === last && tier ? portraitCanvas(tier.name, 2) : "rect"),
+      pointStyle: points.map((_, j) => j === last && tier ? portraitCanvas(tier.spriteName, 2) : "rect"),
       pointRadius: points.map((_, j) => j === last ? 13 : 3), pointHoverRadius: points.map((_, j) => j === last ? 14 : 5) };
   });
   $("chart-wrap").hidden = !datasets.length || !window.Chart;
@@ -1601,6 +1621,7 @@ function headOn(rows) {
       ["pts", a.points, b.points, Math.max(3, 0.1 * Math.max(ptsOf(a), ptsOf(b)))],
       ["CF rating", a.cf_rating, b.cf_rating, 30],
       ["LC rating", a.lc_rating, b.lc_rating, 30],
+      ["CC rating", a.cc_rating, b.cc_rating, 30],
     ]) {
       if (x == null || y == null || (!x && !y)) continue;
       const score = Math.abs(x - y) / limit;
@@ -1619,27 +1640,26 @@ function renderAlert() {
   $("alert-watch").onclick = () => { duelPick = [h.a.name, h.b.name]; renderArena(); $("arena").scrollIntoView({ behavior: "smooth" }); };
 }
 function fighterCard(r, side, hpShare, color) {
-  const cf = r.cf_rating, lc = r.lc_rating;
-  const rating = (cf ?? -1) >= (lc ?? -1) ? cf : lc;
-  const t = playerTier(cf, lc);
+  const t = playerTier(r.cf_rating, r.lc_rating, "all", r.cc_rating);
+  const rating = t?.rating;
   const lv = Math.max(1, Math.floor((rating ?? 0) / 100));
   const xp = !t ? `<div class="xp gold"><span class="lbl">unrated</span></div>`
     : t.next ? `<div class="xp gold"><i style="--p:${Math.min(1, Math.max(0, t.pct)).toFixed(3)}"></i><span class="lbl">${Math.round(rating)}/${t.next}</span></div>`
     : `<div class="xp gold"><i style="--p:1"></i><span class="lbl">DING</span></div>`;
   return `<div class="fighter ${side}${t ? "" : " unrated"}" style="--c:${color}">` +
     `<div class="f-name">${side === "right" ? `<small>Lv.${lv}</small>` : ""}${esc(r.name)}${side === "left" ? `<small>Lv.${lv}</small>` : ""}</div>` +
-    `<div class="f-tier" style="color:${t?.color ?? "var(--faint)"}">${t ? `${(cf ?? -1) >= (lc ?? -1) ? "CF" : "LC"} ${t.name}` : "Unrated"}</div>` +
+    `<div class="f-tier" style="color:${t?.color ?? "var(--faint)"}">${t ? `${t.platform} ${t.name}` : "Unrated"}</div>` +
     `<div class="bar-row"><span>HP</span><span>${ptsOf(r)} pts</span></div>` +
     `<div class="xp hp"><i style="--p:${hpShare.toFixed(3)}"></i><span class="lbl">${Math.round(hpShare * 100)}%</span></div>` +
     `<div class="bar-row"><span>XP</span><span>${t?.nextName ? `next: ${t.nextName}` : t ? "max tier" : "–"}</span></div>${xp}` +
-    `<div class="f-art"><div class="flip">${sprite(t ? t.name : "Newbie", 5)}</div></div></div>`;
+    `<div class="f-art"><div class="flip">${sprite(t ? t.spriteName : "Newbie", 5)}</div></div></div>`;
 }
 function taunts(a, b, wins, h) {
   if (h) return [[a, `${h.gap ? `${h.gap} ${h.metric}` : "Nothing"} between us. Blink and I pass you.`], [b, "Then don't blink. This round is mine."]];
   if (wins[0] === wins[1]) return [[a, "Dead even? Rematch next week."], [b, "Tie goes to whoever solves the next Hard."]];
   const [lead, trail] = wins[0] > wins[1] ? [a, b] : [b, a];
   const gap = Math.abs(ptsOf(a) - ptsOf(b));
-  const trailTier = playerTier(trail.cf_rating, trail.lc_rating)?.name ?? "peasant";
+  const trailTier = playerTier(trail.cf_rating, trail.lc_rating, "all", trail.cc_rating)?.name ?? "peasant";
   return [
     [lead, gap ? `${gap} points ahead. Kneel, ${trailTier}!` : `More rounds won. Kneel, ${trailTier}!`],
     [trail, ptsOf(trail) === 0 ? "*sharpens sword quietly* The week isn't over." : "Enjoy the lead. Next contest, you fall."],
@@ -1662,7 +1682,7 @@ function renderArena() {
   const shareA = total ? ptsOf(a) / total : 0.5;
   // Rounds: one per stat both players have; higher value takes it.
   const wins = [0, 0];
-  const stats = [["Points", "points"], ["Solved", "solved"], ["CF rating", "cf_rating"], ["LC rating", "lc_rating"]].map(([label, key]) => {
+  const stats = [["Points", "points"], ["Solved", "solved"], ["CF rating", "cf_rating"], ["LC rating", "lc_rating"], ["CC rating", "cc_rating"]].map(([label, key]) => {
     const x = a[key], y = b[key];
     if (x == null && y == null) return `<div class="tug-row"><span class="v">–</span><div class="tug-bar l"></div><span class="lab">${label}</span><div class="tug-bar r"></div><span class="v">–</span></div>`;
     const vx = x ?? 0, vy = y ?? 0, sum = vx + vy;
@@ -1686,9 +1706,9 @@ function renderArena() {
     `<div class="vs"><div class="vs-text">VS</div>${verdict}</div>` + fighterCard(b, "right", 1 - shareA, DUEL_COLORS[1]) + `<div class="floor"></div>`;
   $("tug").innerHTML = `<div class="tug-head"><span style="color:${DUEL_COLORS[0]}">${esc(a.name)}</span><b>ROUNDS ${wins[0]} : ${wins[1]}</b><span style="color:${DUEL_COLORS[1]}">${esc(b.name)}</span></div>` + stats.join("");
   $("dialog").innerHTML = taunts(a, b, wins, h).map(([who, line]) => {
-    const t = playerTier(who.cf_rating, who.lc_rating);
+    const t = playerTier(who.cf_rating, who.lc_rating, "all", who.cc_rating);
     const color = DUEL_COLORS[who === a ? 0 : 1];
-    return `<div class="say${who === a ? "" : " r"}" style="--c:${color}"><div class="pic">${t ? portrait(t.name, 3) : avatar(who.name, 9)}</div>` +
+    return `<div class="say${who === a ? "" : " r"}" style="--c:${color}"><div class="pic">${t ? portrait(t.spriteName, 3) : avatar(who.name, 9)}</div>` +
       `<div class="bubble"><b>${esc(who.name)}</b>${esc(line)}</div></div>`;
   }).join("");
   renderDuelChart(a, b, ++duelToken);
@@ -1800,7 +1820,7 @@ function renderHeatmap() {
   const solvedOf = snap => {
     const st = snap.stats || {};
     const lc = (st.lc_easy ?? 0) + (st.lc_medium ?? 0) + (st.lc_hard ?? 0);
-    return platform === "cf" ? st.cf_solved ?? 0 : platform === "lc" ? lc : snap.solved;
+    return { cf: st.cf_solved ?? 0, lc, cc: st.cc_solved ?? 0, all: snap.solved }[platform];
   };
   // Grid: HEATMAP_WEEKS full weeks ending with the current week (columns = weeks, rows = Sun..Sat).
   const today = new Date();
@@ -1823,7 +1843,7 @@ function renderHeatmap() {
     const key = dayKey(taken), gains = gainsByUser.get(snap.user_id);
     gains.set(key, (gains.get(key) ?? 0) + Math.max(0, value - prev));
   }
-  const color = platform === "cf" ? "var(--cf)" : platform === "lc" ? "var(--lc)" : "var(--gold)";
+  const color = platform === "all" ? "var(--gold)" : `var(--${platform})`;
   const rows = [...gainsByUser].map(([userId, gains]) => {
     let total = 0;
     const cells = days.map(d => {
@@ -1839,7 +1859,7 @@ function renderHeatmap() {
   }).sort((a, b) => b.total - a.total);
   $("heatmap").style.setProperty("--hm", color);
   $("heatmap").innerHTML = (rows.map(r => r.html).join("") || `<div class="loading">no snapshots yet</div>`) +
-    `<div class="hm-foot"><span>${platform === "all" ? "All platforms" : platform === "cf" ? "Codeforces" : "LeetCode"} · fills in as snapshots are saved</span>` +
+    `<div class="hm-foot"><span>${platform === "all" ? "All platforms" : PLATFORMS[platform].name} · fills in as snapshots are saved</span>` +
     `<span class="hm-scale">less${[0, 1, 2, 3, 4].map(l => `<i data-l="${l}" style="background:${l ? `color-mix(in srgb, ${color} ${[0, 35, 60, 82, 100][l]}%, var(--track))` : "var(--track)"}"></i>`).join("")}more</span></div>`;
   for (const grid of $("heatmap").querySelectorAll(".hm-grid")) grid.scrollLeft = grid.scrollWidth; // newest weeks in view
 }
@@ -1861,7 +1881,6 @@ async function loadContests() {
   renderCountdown();
   $("contests").innerHTML = data.map(contest => {
     const url = /^https:\/\//i.test(contest.url) ? contest.url : "#";
-    const cf = contest.platform === "codeforces";
     const when = new Date(contest.start).toLocaleString(undefined, { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
     return `<tr><td class="tagcell">${contestTag(contest)}</td><td><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(contest.name)}</a>` +
       `<div class="when">${esc(when)} · ${Math.round(contest.duration / 60)}m</div></td></tr>`;
@@ -1916,6 +1935,7 @@ async function loadProfile(user) {
   $("name").value = profile?.name || user.name;
   $("codeforces").value = accounts.find(account => account.platform === "codeforces")?.handle || suggestedHandle;
   $("leetcode").value = accounts.find(account => account.platform === "leetcode")?.handle || suggestedHandle;
+  $("codechef").value = accounts.find(account => account.platform === "codechef")?.handle || "";
   updateProfileLinks();
   const pending = accounts.filter(account => !account.verified).map(account => account.platform);
   setMessage("profile-message", pending.length ? `Pending verification: ${pending.join(", ")}.` : "");
@@ -1949,7 +1969,7 @@ for (const [key, label] of Object.entries(PERIODS)) {
 
 if (!configured) {
   $("updated").textContent = "Set the Supabase project URL and anon key in this page to connect.";
-  $("board").innerHTML = "<tr><td colspan=\"6\">Supabase configuration required.</td></tr>";
+  $("board").innerHTML = "<tr><td colspan=\"7\">Supabase configuration required.</td></tr>";
   $("contests").innerHTML = "<tr><td>Supabase configuration required.</td></tr>";
 } else {
   // ---------- 8-bit sign-in on top of Clerk's sign-in/sign-up API (no Clerk UI) ----------
@@ -2060,7 +2080,8 @@ if (!configured) {
     if (!user) return setMessage("profile-message", "Sign in before saving a profile.");
     const accountsToSave = [
       { platform: "codeforces", inputId: "codeforces" },
-      { platform: "leetcode", inputId: "leetcode" }
+      { platform: "leetcode", inputId: "leetcode" },
+      { platform: "codechef", inputId: "codechef" }
     ].map(account => ({
       ...account,
       raw: $(account.inputId).value.trim(),

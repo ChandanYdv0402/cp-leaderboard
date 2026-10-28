@@ -61,15 +61,15 @@ security. That's why this key lives only in GitHub Actions secrets, never in the
    1. Start from their **previous** stats (`previous_stats`), so a failed fetch keeps old numbers
       instead of dropping them to zero.
    2. If they **unlinked** a platform, zero that platform's fields.
-   3. For each linked account, `match` on the platform and call the fetcher with `&mut stats`.
-      - success → PATCH `verified = true` on that account,
+   3. For each linked account (Codeforces, LeetCode, or CodeChef), clone the current stats and pass that copy to the platform fetcher.
+      - success → keep the fetched copy and PATCH `verified = true` on that account,
       - failure → log with `eprintln!` and keep going.
    4. Build a `SnapshotRow` (computing `points()` / `solved()` before moving `stats` in).
 4. Insert all rows in one POST.
 
 ## `fetch_contests`
 
-Get both sites' contests (logging, not failing, if one site is down), convert unix seconds to
+Get all supported sites' contests (logging, not failing, if one site is down), convert unix seconds to
 dates, and **upsert**: `on_conflict=platform,url` + `resolution=merge-duplicates` updates
 existing rows instead of erroring. Then delete contests that started over a day ago.
 

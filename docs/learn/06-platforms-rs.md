@@ -1,20 +1,22 @@
 # 6. Walkthrough: `src/platforms.rs`
 
-**Job:** talk to Codeforces and LeetCode, and return plain Rust data. It knows nothing about
+**Job:** talk to Codeforces, LeetCode, and CodeChef, and return plain Rust data. It knows nothing about
 Supabase. Open the file alongside this page; it's commented line by line.
 
 ## What it exports (`pub`)
 
 | Item | Kind | Purpose |
 |------|------|---------|
-| `Stats` | struct | One person's numbers on both sites |
-| `Stats::points()` | method | Score: CF rating/100 per problem + LC 5/10/20 |
+| `Stats` | struct | One person's numbers across supported sites |
+| `Stats::points()` | method | CF rating/100 per problem + LC 5/10/20 + CC 10 per solved problem |
 | `Stats::solved()` | method | Total problems solved |
 | `Contest` | struct | An upcoming contest from either site |
 | `fetch_codeforces(client, handle, &mut stats)` | fn | Fill in `cf_rating`, `cf_solved`, `cf_points` |
 | `fetch_leetcode(client, user, &mut stats)` | fn | Fill in `lc_rating`, `lc_easy/medium/hard` |
+| `fetch_codechef(client, user, &mut stats)` | fn | Fill in `cc_rating` and `cc_solved` |
 | `codeforces_contests(client)` | fn | Upcoming Codeforces contests |
 | `leetcode_contests(client)` | fn | Upcoming LeetCode contests |
+| `codechef_contests(client)` | fn | Upcoming CodeChef contests |
 
 The private helpers `cf_get` and `lc_query` handle the HTTP and error checking for each site.
 
@@ -22,12 +24,15 @@ The private helpers `cf_get` and `lc_query` handle the HTTP and error checking f
 
 ```rust
 #[derive(Serialize, Deserialize, Clone, Default)]
+#[serde(default)]
 pub struct Stats {
     pub cf_rating: Option<i64>,
     pub cf_solved: u32,
     pub cf_points: u32,
     pub lc_rating: Option<f64>,
     pub lc_easy: u32, pub lc_medium: u32, pub lc_hard: u32,
+    pub cc_rating: Option<i64>,
+    pub cc_solved: u32,
 }
 ```
 
@@ -80,10 +85,12 @@ store. **If LeetCode changes this endpoint, this is the function to fix.**
 
 ## Contests
 
-Both `*_contests` functions turn the site's list into `Vec<Contest>` with an iterator chain
+The `*_contests` functions turn the site's list into `Vec<Contest>` with an iterator chain
 (`filter` → `map` → `collect`). Times are unix seconds; `main.rs` converts them to real dates.
 
 ## Try it
+
+CodeChef uses public profile HTML for rating/total solved and its public contest JSON feed. The parsers reject malformed responses so the caller retains its previous numbers. Profiles with an explicitly empty rating history are unrated. `#[serde(default)]` fills new CodeChef fields when reading older snapshots, preserving compatibility. CodeChef scoring is `cc_solved * 10` in both Rust and SQL.
 
 - Change scoring: edit `points()`. Then also update the SQL `leaderboard()` function, which
   recomputes LeetCode points itself, so both match.

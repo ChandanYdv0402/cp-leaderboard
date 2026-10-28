@@ -23,7 +23,7 @@ function installMock() {
     { id: 'group-b', name: 'Study group', owner_id: 'bob' },
   ];
   const state = window.mock = {
-    user: owner, groups: initialGroups, calls: [], charts: [], slowGroup: false,
+    user: owner, groups: initialGroups, calls: [], charts: [], slowGroup: false, codechef: false,
     invitation: 'a'.repeat(32), authCallback: null,
     async signOut() { this.user = null; window.Clerk.user = null; this.authCallback(); },
     async signIn() { this.user = owner; window.Clerk.user = owner; this.authCallback(); },
@@ -33,14 +33,14 @@ function installMock() {
     { user_id: 'bob', profiles: { name: 'Bob' } },
   ];
   const rows = [
-    { name: 'Alice', points: 100, solved: 10, cf_points: 60, cf_solved: 6, lc_points: 40, lc_solved: 4, cf_rating: 1400, lc_rating: null, has_snapshot: true },
-    { name: 'Bob', points: 0, solved: 0, cf_points: 0, cf_solved: 0, lc_points: 0, lc_solved: 0, cf_rating: null, lc_rating: null, has_snapshot: false },
+    { name: 'Alice', points: 100, solved: 10, cf_points: 60, cf_solved: 6, lc_points: 40, lc_solved: 4, cc_points: 0, cc_solved: 0, cc_rating: null, cf_rating: 1400, lc_rating: null, has_snapshot: true },
+    { name: 'Bob', points: 0, solved: 0, cf_points: 0, cf_solved: 0, lc_points: 0, lc_solved: 0, cc_points: 0, cc_solved: 0, cc_rating: null, cf_rating: null, lc_rating: null, has_snapshot: false },
   ];
   const profiles = [{ id: 'alice', name: 'Alice' }, { id: 'bob', name: 'Bob' }, { id: 'outsider', name: 'Global outsider' }];
   const snaps = ['alice', 'outsider'].flatMap(user_id => [0, 1].map(day => ({
     user_id, taken_at: new Date(Date.now() - (1 - day) * 864e5).toISOString(),
     points: 50 + 50 * day, solved: 5 + 5 * day, cf_rating: 1400, lc_rating: null,
-    stats: { cf_points: 30 + 30 * day, cf_solved: 3 + 3 * day, lc_medium: 2 + 2 * day },
+    stats: { cf_points: 30 + 30 * day, cf_solved: 3 + 3 * day, lc_medium: 2 + 2 * day, cc_solved: 2 + 3 * day, cc_rating: 1723 },
   })));
   window.Clerk = {
     user: owner, session: { getToken: async () => 'test-token' },
@@ -57,10 +57,12 @@ function installMock() {
       state.calls.push({ table });
       const query = {
         select() { return this; }, eq() { return this; }, gte() { return this; },
-        order() { return this; }, range() { return this; }, limit() { return this; }, upsert() { return this; }, delete() { return this; },
+        order() { return this; }, range() { return this; }, limit() { return this; },
+        upsert(value) { state.calls.push({ table, upsert: value }); return this; }, delete() { return this; },
         maybeSingle() { return Promise.resolve({ data: table === 'profiles' ? { name: 'Alice' } : null }); },
         then(resolve, reject) {
-          const data = { groups: state.groups.slice(), group_members: members.slice(), accounts: [], contests: [], profiles, snapshots: snaps }[table];
+          const contests = [{ platform: 'codechef', name: 'CodeChef Starters', start: new Date(Date.now() + 864e5).toISOString(), duration: 7200, url: 'https://www.codechef.com/START262' }];
+          const data = { groups: state.groups.slice(), group_members: members.slice(), accounts: [], contests, profiles, snapshots: snaps }[table];
           return Promise.resolve({ data }).then(resolve, reject);
         },
       };
@@ -71,7 +73,12 @@ function installMock() {
       if (name === 'leaderboard') return { data: [{ ...rows[0], name: 'Global outsider', points: 999 }] };
       if (name === 'group_leaderboard') {
         const factor = args.days === null ? 2 : 1;
-        const result = rows.map(row => ({ ...row, points: row.points * factor, cf_points: row.cf_points * factor, lc_points: row.lc_points * factor }));
+        const result = rows.map((row, index) => {
+          const cc_solved = state.codechef ? (index ? 8 : 5) : 0;
+          return { ...row, points: (row.points + cc_solved * 10) * factor, solved: row.solved + cc_solved,
+            cf_points: row.cf_points * factor, lc_points: row.lc_points * factor, cc_points: cc_solved * 10 * factor,
+            cc_solved, cc_rating: state.codechef ? (index ? 1900 : 1723) : null, has_snapshot: state.codechef || row.has_snapshot };
+        });
         if (state.slowGroup) await new Promise(resolve => setTimeout(resolve, 150));
         return { data: result };
       }
@@ -225,6 +232,42 @@ test('group dashboard works in a real browser', { skip: !browserPath && 'Set CP_
     await evaluate(`document.querySelector('[data-v="standings"]').click()`);
   });
 
+  await t.test('CodeChef handles normalize and save without accepting another platform URL', async () => {
+    assert.equal(await evaluate(`document.getElementById('codechef').value`), '');
+    await evaluate(`document.getElementById('codechef').value = 'https://codeforces.com/profile/wrong'; document.getElementById('codechef').dispatchEvent(new Event('input')); document.getElementById('profile-form').requestSubmit()`);
+    await waitFor(`document.getElementById('profile-message').textContent.includes('valid codechef')`);
+    assert.equal(await evaluate(`document.getElementById('codechef-link').hidden`), true);
+    await evaluate(`document.getElementById('codechef').value = 'https://www.codechef.com/users/chef_123/?tab=profile'; document.getElementById('codechef').dispatchEvent(new Event('blur'))`);
+    assert.equal(await evaluate(`document.getElementById('codechef').value`), 'chef_123');
+    assert.equal(await evaluate(`document.getElementById('codechef-link').href`), 'https://www.codechef.com/users/chef_123');
+    await evaluate(`document.getElementById('profile-form').requestSubmit()`);
+    await waitFor(`document.getElementById('profile-message').textContent.startsWith('Saved.')`);
+    assert.deepEqual(await evaluate(`mock.calls.find(call => call.table === 'accounts' && call.upsert?.platform === 'codechef').upsert`),
+      { user_id: 'alice', platform: 'codechef', handle: 'chef_123', verified: false });
+  });
+
+  await t.test('CodeChef filters, ratings, charts, rank cards, heatmaps, and contests render correctly', async () => {
+    await evaluate(`mock.codechef = true; document.querySelector('[data-k="week"]').click()`);
+    await waitFor(`document.getElementById('group-points').textContent === '230'`);
+    await evaluate(`document.getElementById('platform').value = 'cc'; document.getElementById('platform').dispatchEvent(new Event('change'))`);
+    assert.equal(await evaluate(`document.getElementById('group-points').textContent`), '130');
+    assert.equal(await evaluate(`document.getElementById('group-solved').textContent`), '13');
+    assert.equal(await evaluate(`document.getElementById('cf-head').hidden && document.getElementById('lc-head').hidden && !document.getElementById('cc-head').hidden`), true);
+    assert.equal(await evaluate(`document.getElementById('board').firstElementChild.textContent.includes('Bob')`), true);
+    assert.equal(await evaluate(`document.getElementById('board').textContent.includes('1900')`), true);
+    assert.equal(await evaluate(`document.getElementById('ranks').textContent.includes('CC 4 stars')`), true);
+    assert.equal(await evaluate(`document.getElementById('heatmap').textContent.includes('CodeChef') && !document.getElementById('heatmap').textContent.includes('Global outsider')`), true);
+    assert.deepEqual(await evaluate(`mock.charts.filter(chart => chart.id === 'chart').at(-1).config.data.datasets.map(dataset => dataset.label)`), ['CodeChef']);
+    await evaluate(`document.querySelector('[data-v="progress"]').click()`);
+    await waitFor(`mock.charts.filter(chart => chart.id === 'chart').at(-1)?.config.type === 'line'`);
+    assert.deepEqual(await evaluate(`mock.charts.filter(chart => chart.id === 'chart').at(-1).config.data.datasets[0].data.map(point => point.y)`), [0, 30]);
+    assert.equal(await evaluate(`document.querySelector('#contests .tag.cc').textContent`), 'CC');
+    assert.equal(await evaluate(`document.getElementById('countdown').textContent.includes('CodeChef Starters')`), true);
+    assert.equal(await evaluate(`!!document.querySelector('#calendar .marks .cc')`), true);
+    await evaluate(`mock.codechef = false; document.getElementById('platform').value = 'all'; document.getElementById('platform').dispatchEvent(new Event('change')); document.querySelector('[data-v="standings"]').click(); document.querySelector('[data-k="week"]').click()`);
+    await waitFor(`document.getElementById('group-points').textContent === '100'`);
+  });
+
   await t.test('global rankings remain selected when an older group response arrives', async () => {
     await evaluate(`mock.slowGroup = true; document.querySelector('[data-k="week"]').click(); document.getElementById('global-rankings').click()`);
     await waitFor(`document.getElementById('board').textContent.includes('Global outsider')`);
@@ -258,8 +301,11 @@ test('group dashboard works in a real browser', { skip: !browserPath && 'Set CP_
   });
 
   await t.test('mobile layout fits, sign-out clears private UI, and global preference persists', async () => {
+    await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 800, deviceScaleFactor: 1, mobile: true });
+    const narrowWidth = await evaluate(`document.documentElement.scrollWidth`);
+    assert.ok(narrowWidth <= 320, `Page width ${narrowWidth} exceeds the 320px viewport.`);
     await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-    assert.equal(await evaluate(`document.documentElement.scrollWidth <= window.innerWidth`), true);
+    assert.equal(await evaluate(`document.documentElement.scrollWidth <= 390`), true);
     if (process.env.CP_QA_SCREENSHOT) {
       const screenshot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
       await writeFile(process.env.CP_QA_SCREENSHOT, Buffer.from(screenshot.data, 'base64'));

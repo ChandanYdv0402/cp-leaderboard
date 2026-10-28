@@ -5,13 +5,15 @@ import { PGlite } from '@electric-sql/pglite';
 
 const schema = await readFile(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
 const migration = await readFile(new URL('../supabase/migrations/202610250001_groups.sql', import.meta.url), 'utf8');
+const codechef = await readFile(new URL('../supabase/migrations/202610280001_codechef.sql', import.meta.url), 'utf8');
 const alice = 'user_alice';
 const bob = 'user_bob';
 const outsider = 'user_outsider';
 const noProfile = 'user_without_profile';
 
 test('fresh schema includes the exact incremental groups migration', () => {
-  assert.ok(schema.endsWith(migration));
+  assert.ok(schema.includes(migration));
+  assert.ok(schema.endsWith(codechef));
 });
 
 test('invitation-only groups enforce membership and ownership in PostgreSQL', async t => {
@@ -38,6 +40,7 @@ test('invitation-only groups enforce membership and ownership in PostgreSQL', as
     alter default privileges in schema public grant execute on functions to anon, authenticated;
   `);
   await db.exec(migration);
+  await db.exec(codechef);
   await db.exec(`
     insert into public.profiles(id, name) values ('${alice}', 'Alice'), ('${bob}', 'Bob'), ('${outsider}', 'Outsider');
     insert into public.snapshots(user_id,taken_at,points,solved,stats) values

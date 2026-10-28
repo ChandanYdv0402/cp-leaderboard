@@ -6,9 +6,9 @@
 //!
 //! Big picture of one run:
 //!   1. `main()` reads Supabase credentials from environment variables.
-//!   2. `fetch_users()` loads every profile + linked handle from Supabase, asks Codeforces/LeetCode
+//!   2. `fetch_users()` loads profiles and linked handles, asks Codeforces/LeetCode/CodeChef
 //!      for fresh stats, and inserts one snapshot row per person.
-//!   3. `fetch_contests()` loads upcoming contests from both sites and upserts them into Supabase.
+//!   3. `fetch_contests()` loads upcoming contests from all supported sites into Supabase.
 
 // `mod platforms;` tells the compiler "there is a module in src/platforms.rs, include it".
 // Rust doesn't discover files automatically: every module must be declared like this.
@@ -71,7 +71,10 @@ impl Supabase {
 
     /// Add Supabase's auth headers to a request. The service-role key bypasses row-level security,
     /// which is why it only lives in GitHub Actions secrets, never in the website.
-    fn authorize(&self, request: reqwest::blocking::RequestBuilder) -> reqwest::blocking::RequestBuilder {
+    fn authorize(
+        &self,
+        request: reqwest::blocking::RequestBuilder,
+    ) -> reqwest::blocking::RequestBuilder {
         // Each `.header(...)` takes the builder and returns it with one more header (method chaining).
         request
             .header("apikey", &self.service_key)
@@ -194,7 +197,10 @@ fn previous_stats(api: &Supabase, user_id: &str) -> Result<Stats> {
     //   .map_or_else(A, B)       -> if None, call A (Stats::default = all zeros);
     //                               if Some(row), call B with the row and return row.stats
     // `|row| row.stats` is a *closure* (an inline function, like `row => row.stats` in JS).
-    Ok(rows.into_iter().next().map_or_else(Stats::default, |row| row.stats))
+    Ok(rows
+        .into_iter()
+        .next()
+        .map_or_else(Stats::default, |row| row.stats))
 }
 
 /// Refresh every person's stats and insert one snapshot row each.
@@ -212,7 +218,10 @@ fn fetch_users(api: &Supabase, client: &reqwest::blocking::Client) -> Result<()>
     for account in accounts {
         // `.entry(key).or_default()` = "get the list for this key, creating an empty one if missing".
         // `.clone()` makes a copy of the String, because `account` itself is moved into the list.
-        by_user.entry(account.user_id.clone()).or_default().push(account);
+        by_user
+            .entry(account.user_id.clone())
+            .or_default()
+            .push(account);
     }
 
     // Pre-size the list: we'll add exactly one row per profile.
@@ -223,41 +232,63 @@ fn fetch_users(api: &Supabase, client: &reqwest::blocking::Client) -> Result<()>
         // This person's accounts as a slice (`&[Account]`), or an empty slice if they have none.
         // `.map(Vec::as_slice)` turns `Option<&Vec<Account>>` into `Option<&[Account]>`,
         // and `.unwrap_or_default()` turns `None` into an empty slice.
-        let user_accounts = by_user.get(&profile.id).map(Vec::as_slice).unwrap_or_default();
+        let user_accounts = by_user
+            .get(&profile.id)
+            .map(Vec::as_slice)
+            .unwrap_or_default();
 
         // If a platform was unlinked, clear its old numbers instead of carrying them forward.
         // `.iter().any(|a| ...)` = "is there at least one item where this is true?" (like JS `.some`).
-        if !user_accounts.iter().any(|account| account.platform == "codeforces") {
+        if !user_accounts
+            .iter()
+            .any(|account| account.platform == "codeforces")
+        {
             stats.cf_rating = None;
             stats.cf_solved = 0;
             stats.cf_points = 0;
         }
-        if !user_accounts.iter().any(|account| account.platform == "leetcode") {
+        if !user_accounts
+            .iter()
+            .any(|account| account.platform == "leetcode")
+        {
             stats.lc_rating = None;
             stats.lc_easy = 0;
             stats.lc_medium = 0;
             stats.lc_hard = 0;
+        }
+        if !user_accounts
+            .iter()
+            .any(|account| account.platform == "codechef")
+        {
+            stats.cc_rating = None;
+            stats.cc_solved = 0;
         }
 
         for account in user_accounts {
             // `match` is Rust's powerful `switch`: compare a value against patterns, top to bottom.
             // `.as_str()` borrows the String as `&str` so it can be matched against string literals.
             // `&mut stats` lends `stats` *mutably* so the fetch function can fill in new numbers.
+            // Work on a copy so a failure after a partial fetch cannot change saved stats.
+            let mut fetched = stats.clone();
             let result = match account.platform.as_str() {
-                "codeforces" => platforms::fetch_codeforces(client, &account.handle, &mut stats),
-                "leetcode" => platforms::fetch_leetcode(client, &account.handle, &mut stats),
+                "codeforces" => platforms::fetch_codeforces(client, &account.handle, &mut fetched),
+                "leetcode" => platforms::fetch_leetcode(client, &account.handle, &mut fetched),
+                "codechef" => platforms::fetch_codechef(client, &account.handle, &mut fetched),
                 _ => continue, // `_` matches anything else: skip unknown platforms
             };
             // `match` on a Result: handle success and failure separately.
             match result {
                 // Success: mark this handle as verified so the site stops showing "pending".
-                Ok(()) => api.patch(
-                    &format!(
-                        "accounts?user_id=eq.{}&platform=eq.{}",
-                        profile.id, account.platform
-                    ),
-                    &json!({ "verified": true }),
-                )?,
+                Ok(()) => {
+                    stats = fetched;
+                    api.patch(
+                        &format!(
+                            "accounts?user_id=eq.{}&platform=eq.{}",
+                            profile.id, account.platform
+                        ),
+                        &json!({ "verified": true }),
+                    )?;
+                }
                 // Failure: log it and move on; `stats` keeps the previous numbers for this platform.
                 // `eprintln!` prints to stderr (shows up in the GitHub Actions log).
                 Err(error) => eprintln!("[{}] {}: {error}", profile.name, account.platform),
@@ -265,7 +296,12 @@ fn fetch_users(api: &Supabase, client: &reqwest::blocking::Client) -> Result<()>
         }
 
         // `println!` prints to stdout. The `!` means it's a *macro*, not a normal function.
-        println!("{}: {} solved, {} pts", profile.name, stats.solved(), stats.points());
+        println!(
+            "{}: {} solved, {} pts",
+            profile.name,
+            stats.solved(),
+            stats.points()
+        );
         rows.push(SnapshotRow {
             user_id: profile.id.clone(),
             points: stats.points(),
@@ -282,7 +318,7 @@ fn fetch_users(api: &Supabase, client: &reqwest::blocking::Client) -> Result<()>
     api.post("snapshots", &rows, "return=minimal")
 }
 
-/// Load upcoming contests from both sites and upsert them into the `contests` table.
+/// Load upcoming contests from all supported sites into the `contests` table.
 fn fetch_contests(api: &Supabase, client: &reqwest::blocking::Client) -> Result<()> {
     let mut contests: Vec<Contest> = Vec::new();
     // If one site fails, log it and still save the other site's contests.
@@ -293,6 +329,10 @@ fn fetch_contests(api: &Supabase, client: &reqwest::blocking::Client) -> Result<
     match platforms::leetcode_contests(client) {
         Ok(found) => contests.extend(found),
         Err(error) => eprintln!("leetcode contests: {error}"),
+    }
+    match platforms::codechef_contests(client) {
+        Ok(found) => contests.extend(found),
+        Err(error) => eprintln!("codechef contests: {error}"),
     }
 
     // Convert each `Contest` into a `ContestRow` (unix seconds -> real date).
@@ -330,7 +370,7 @@ fn fetch_contests(api: &Supabase, client: &reqwest::blocking::Client) -> Result<
 /// with a failure code, which makes the GitHub Actions run show as failed.
 fn main() -> Result<()> {
     let api = Supabase::from_env()?;
-    // A separate HTTP client for the Codeforces/LeetCode requests.
+    // A separate HTTP client for coding-platform requests.
     let client = reqwest::blocking::Client::builder()
         .user_agent("cp-leaderboard")
         .build()?;
