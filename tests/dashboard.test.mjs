@@ -10,7 +10,7 @@ import { once } from 'node:events';
 
 const browserPath = process.env.CP_BROWSER || [
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-  '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser',
 ].find(existsSync);
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -116,9 +116,12 @@ test('group dashboard works in a real browser', { skip: !browserPath && 'Set CP_
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const browser = spawn(browserPath, [
-    '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check',
+    '--headless=new', '--disable-gpu', '--disable-dev-shm-usage', '--no-sandbox', '--no-first-run', '--no-default-browser-check',
     '--remote-debugging-port=0', `--user-data-dir=${temp}`, 'about:blank',
-  ], { stdio: 'ignore', windowsHide: true });
+  ], { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
+  let browserLog = '';
+  browser.stderr.on('data', chunk => { browserLog = (browserLog + chunk).slice(-4000); });
+  browser.on('error', error => { browserLog += error.message; });
   let socket;
   t.after(async () => {
     socket?.close();
@@ -131,10 +134,11 @@ test('group dashboard works in a real browser', { skip: !browserPath && 'Set CP_
     await rm(resolvedTemp, { recursive: true, force: true, maxRetries: 8, retryDelay: 200 }).catch(() => {});
   });
   let port;
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 200; i++) {
+    if (browser.exitCode !== null) break;
     try { port = (await readFile(path.join(temp, 'DevToolsActivePort'), 'utf8')).split('\n')[0]; break; } catch { await delay(100); }
   }
-  assert.ok(port, 'Browser must expose its debugging endpoint');
+  assert.ok(port, `Browser must expose its debugging endpoint. ${browserLog}`);
   t.diagnostic('Browser debugging endpoint ready.');
   const pages = await (await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(5000) })).json();
   socket = new WebSocket(pages.find(page => page.type === 'page').webSocketDebuggerUrl);
