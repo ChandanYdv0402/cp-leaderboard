@@ -111,6 +111,7 @@ test('group dashboard works in a real browser', { skip: !browserPath && 'Set CP_
     .replace(/import \{ createClient \} from "[^"]+";/, 'const createClient = window.createClient;')
     .replace(/async function loadClerk\(\) \{[\s\S]*?\n\}\nfunction currentUser/, 'async function loadClerk() { return window.Clerk; }\nfunction currentUser')
     .replace(/<script defer src="https:\/\/cdnjs[^>]+><\/script>/, '')
+    .replace(/<link[^>]+href="https:\/\/fonts\.[^"]+"[^>]*>/g, '')
     .replace('<script type="module">', `<script>(${installMock.toString()})()</script><script type="module">`);
   const server = createServer((_req, res) => { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.end(html); });
   server.listen(0, '127.0.0.1');
@@ -168,13 +169,13 @@ test('group dashboard works in a real browser', { skip: !browserPath && 'Set CP_
     return result.result.value;
   };
   const waitFor = async expression => {
-    for (let i = 0; i < 100; i++) { if (await evaluate(expression)) return; await delay(30); }
+    for (let i = 0; i < 200; i++) { if (await evaluate(expression)) return; await delay(30); }
     assert.fail(`Timed out waiting for ${expression}`);
   };
   await send('Runtime.enable');
   t.diagnostic('Navigating to dashboard fixture.');
   await send('Page.navigate', { url: `http://127.0.0.1:${server.address().port}/?invite=${'a'.repeat(32)}` });
-  await waitFor(`document.getElementById('board').textContent.includes('Alice')`);
+  await waitFor(`document.getElementById('board')?.textContent.includes('Alice')`);
 
   await t.test('opens a group by default, renders safe names, pending stats, and period totals', async () => {
     assert.equal(await evaluate(`document.getElementById('dashboard-title').textContent`), 'Friends <club>');

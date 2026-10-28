@@ -54,7 +54,7 @@ CP Leaderboard is a static GitHub Pages site for Codeforces, LeetCode, and CodeC
 
 ## Current Blockers / Unverified
 
-- The CodeChef migration has not been applied to hosted Supabase. Until it is, CodeChef linking and its leaderboard fields are unavailable. Live signed-in CodeChef linking/collection remains unverified. Rust compilation/tests passed in Linux CI; the dashboard CI browser-launch fix awaits verification.
+- The CodeChef migration has not been applied to hosted Supabase. Until it is, CodeChef linking and its leaderboard fields are unavailable. Live signed-in CodeChef linking/collection remains unverified. Rust compilation/tests passed in Linux CI; dashboard CI fixes now select Chrome, wait for DOM creation, and omit external fonts from fixtures, awaiting verification.
 - The groups migration has not been applied to hosted Supabase. Apply `supabase/migrations/202610250001_groups.sql` once after the Clerk/per-platform prerequisites; fresh projects use the full schema instead. Until then, the UI falls back to global rankings. Verify group access, invitations, and owner actions with separate real accounts after rollout.
 - Supabase Auth (Google OAuth / email OTP) is no longer used by the site; login providers are now configured in Clerk. Clerk sign-in, token acceptance by Supabase, and RLS writes with Clerk ids are untested.
 - No users have signed up or connected handles yet, so per-user snapshots and handle verification remain untested.
